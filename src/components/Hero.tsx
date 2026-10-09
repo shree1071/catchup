@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { RaycastHeroScene } from './RaycastHeroScene';
 import { Sparkles, ArrowDown, ShieldCheck, Zap } from 'lucide-react';
-import { PlatformIcons } from './ComposioConnectSection';
+import { PlatformIcons } from './PlatformIcons';
 
 interface HeroProps {
   tagline: string;

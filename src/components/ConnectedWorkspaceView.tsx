@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { sendGroqChat } from '../services/groqService';
 import { MarkdownMessage } from './MarkdownMessage';
-import { PlatformIcons } from './ComposioConnectSection';
+import { PlatformIcons } from './PlatformIcons';
 import {
   fetchLiveChannels,
   fetchLiveMessages,

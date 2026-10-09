@@ -70,7 +70,7 @@ flowchart TD
 
     subgraph Presentation [4. Raycast Midnight Presentation Surface]
         TLDR & URGENCY & ACTIONS & DECISIONS & THINK --> UI[CatchUp Frontend Surface]
-        UI --> M1[Native Zero-Dependency Markdown Engine: Tables, Code Copy, Channel Badges]
+        UI --> M1[Native Zero-Dependency MarkdownMessage Engine: Tables, Code Copy, Channel Badges]
         UI --> M2[Official Brand Logos: React-Icons BsSlack, BsTeams, SiNotion]
         UI --> M3[Command Palette: Cmd+K / Cmd+U Quick Triage]
         UI --> M4[Interactive Audio SpeechSynthesis Tts]

@@ -6,19 +6,20 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Check } from 'lucide-react';
 import { Footer } from './components/Footer';
 
-// Lazy-loaded heavy components for code-splitting & reduced initial bundle
+import { TriageComparisonSection } from './components/TriageComparisonSection';
+import { ComposioConnectSection } from './components/ComposioConnectSection';
+import { AppWindowMockup } from './components/AppWindowMockup';
+import { FeatureGrid } from './components/FeatureGrid';
+import { ExtensionsGrid } from './components/ExtensionsGrid';
+import { QuickStartTerminal } from './components/QuickStartTerminal';
+
+// Lazy-loaded heavy subviews & modals for optimal bundle splitting
 const ChatbotView = lazy(() => import('./components/ChatbotView').then(m => ({ default: m.ChatbotView })));
 const ConnectedWorkspaceView = lazy(() => import('./components/ConnectedWorkspaceView').then(m => ({ default: m.ConnectedWorkspaceView })));
 const CommandPaletteModal = lazy(() => import('./components/CommandPaletteModal').then(m => ({ default: m.CommandPaletteModal })));
 const ZapierMcpModal = lazy(() => import('./components/ZapierMcpModal').then(m => ({ default: m.ZapierMcpModal })));
 const TeamsCatchUpModal = lazy(() => import('./components/TeamsCatchUpModal').then(m => ({ default: m.TeamsCatchUpModal })));
 const CustomizeDrawer = lazy(() => import('./components/CustomizeDrawer').then(m => ({ default: m.CustomizeDrawer })));
-const AppWindowMockup = lazy(() => import('./components/AppWindowMockup').then(m => ({ default: m.AppWindowMockup })));
-const FeatureGrid = lazy(() => import('./components/FeatureGrid').then(m => ({ default: m.FeatureGrid })));
-const ExtensionsGrid = lazy(() => import('./components/ExtensionsGrid').then(m => ({ default: m.ExtensionsGrid })));
-const QuickStartTerminal = lazy(() => import('./components/QuickStartTerminal').then(m => ({ default: m.QuickStartTerminal })));
-const ComposioConnectSection = lazy(() => import('./components/ComposioConnectSection').then(m => ({ default: m.ComposioConnectSection })));
-const TriageComparisonSection = lazy(() => import('./components/TriageComparisonSection').then(m => ({ default: m.TriageComparisonSection })));
 
 function LoadingFallback() {
   return (
@@ -130,8 +131,7 @@ export function App() {
 
       {/* Main View: Landing vs Connect Hub vs AI Chatbot */}
       <ErrorBoundary fallbackTitle="View failed to load">
-        <Suspense fallback={<LoadingFallback />}>
-          <main className={`flex flex-col items-center w-full ${activeView === 'landing' ? 'pt-0' : activeView === 'chat' ? 'pt-0 h-screen overflow-hidden' : 'pt-20'}`}>
+        <main className={`flex flex-col items-center w-full ${activeView === 'landing' ? 'pt-0' : activeView === 'chat' ? 'pt-0 h-screen overflow-hidden' : 'pt-20'}`}>
         {activeView === 'landing' ? (
           <>
             {/* Hero Section with Red/Blue Gradient Geometry & 56px Inter regular title */}
@@ -186,20 +186,23 @@ export function App() {
           </>
         ) : activeView === 'connect' ? (
           /* Dedicated Connected Workspaces (Slack, Notion, Teams) & AI Summarizer Studio */
-          <ConnectedWorkspaceView
-            onBackToLanding={() => setActiveView('landing')}
-            onNavigateToChat={() => setActiveView('chat')}
-            onOpenZapierModal={() => setIsZapierModalOpen(true)}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <ConnectedWorkspaceView
+              onBackToLanding={() => setActiveView('landing')}
+              onNavigateToChat={() => setActiveView('chat')}
+              onOpenZapierModal={() => setIsZapierModalOpen(true)}
+            />
+          </Suspense>
         ) : (
           /* Full AI Chatbot View powered by Groq API & Zapier MCP */
-          <ChatbotView
-            onBackToLanding={() => setActiveView('landing')}
-            onOpenZapierModal={() => setIsZapierModalOpen(true)}
-          />
+          <Suspense fallback={<LoadingFallback />}>
+            <ChatbotView
+              onBackToLanding={() => setActiveView('landing')}
+              onOpenZapierModal={() => setIsZapierModalOpen(true)}
+            />
+          </Suspense>
         )}
-          </main>
-        </Suspense>
+        </main>
       </ErrorBoundary>
 
       {/* Footer (Hidden in chat view for native full-height chat app) */}
