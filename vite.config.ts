@@ -2,7 +2,7 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { defineConfig, type Plugin } from 'vite'
 
-const COMPOSIO_API_KEY = 'ck__9DzbdkSNZy49BvHcVyA';
+const COMPOSIO_API_KEY = process.env.VITE_COMPOSIO_API_KEY || process.env.COMPOSIO_API_KEY || '';
 const COMPOSIO_ENDPOINT = 'https://connect.composio.dev/mcp';
 
 async function callComposioMcpTool(name: string, args: Record<string, any>) {
@@ -186,6 +186,24 @@ function composioBridgePlugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), composioBridgePlugin()],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/react-dom') || id.includes('node_modules/react/')) {
+            return 'vendor-react';
+          }
+          if (id.includes('node_modules/three')) {
+            return 'vendor-three';
+          }
+          if (id.includes('node_modules/lucide-react') || id.includes('node_modules/react-icons')) {
+            return 'vendor-icons';
+          }
+        },
+      },
+    },
+    sourcemap: false,
+  },
   server: {
     proxy: {
       '/api/ollama': {
