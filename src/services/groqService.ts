@@ -884,9 +884,16 @@ function localHeuristicSummarizer(
   return {
     channelName,
     totalMessages: lines.length,
-    unreadCount,
-    urgencyLevel: actionItems.some((a) => a.priority === 'P0') ? 'P0 - Critical' : 'P1 - High',
-    urgencyReason: 'Local-first heuristics detected critical keywords, action items, and unread mentions.',
+    urgencyLevel: actionItems.some((a) => a.priority === 'P0')
+      ? 'P0 - Critical'
+      : actionItems.some((a) => a.priority === 'P1')
+      ? 'P1 - High'
+      : deadlines.length > 0
+      ? 'P2 - Moderate'
+      : 'P3 - Low',
+    urgencyReason: actionItems.length > 0
+      ? 'Local-first heuristics detected action items and unread channel activity.'
+      : 'Routine team coordination with no urgent blockers or P0 incidents.',
     tldr: [
       `Summarized ${lines.length} unread messages from ${channelName}.`,
       `${actionItems.length} action items and ${deadlines.length} deadlines detected.`,

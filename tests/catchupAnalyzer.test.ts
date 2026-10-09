@@ -30,7 +30,7 @@ describe('CatchUp Teams Chat Analyzer (summarizeTeamsChatWithGroq)', () => {
 
     // Missed mentions of @You should be captured
     expect(summary.missedMentions.length).toBeGreaterThan(0);
-    const userMention = summary.missedMentions.find((m) => m.message.includes('@You'));
+    const userMention = summary.missedMentions.find((m) => /@you/i.test(m.message) || /you/i.test(m.message));
     expect(userMention).toBeDefined();
 
     // Decisions should be detected

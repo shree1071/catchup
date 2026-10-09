@@ -16,108 +16,54 @@ interface ComposioConnectSectionProps {
   onNotify?: (msg: string) => void;
 }
 
-// Pixel-perfect Brand Logos for Composio-connected platforms
+import { BsSlack, BsMicrosoftTeams } from 'react-icons/bs';
+import { SiNotion, SiGithub, SiDiscord } from 'react-icons/si';
+import { FcGoogle } from 'react-icons/fc';
+
+// Official, crisp brand logos imported from verified icon packages
 export const PlatformIcons = {
-  Teams: ({ className = 'w-6 h-6' }: { className?: string } = {}) => (
-    <svg viewBox="0 0 24 24" className={`${className} shrink-0`} fill="none">
-      {/* Back figure (indigo/purple) */}
-      <circle cx="17.5" cy="7.5" r="2.5" fill="#505AC9" />
-      <path
-        d="M20.5 12h-5.5a2 2 0 0 0-2 2v3.5a3.5 3.5 0 0 0 7 0V14a2 2 0 0 0 .5-2z"
-        fill="#505AC9"
+  Teams: ({ className = 'w-6 h-6' }: { className?: string } = {}) => {
+    const hasColor = /text-/.test(className);
+    return (
+      <BsMicrosoftTeams
+        className={`${className} ${hasColor ? '' : 'text-[#505AC9]'} shrink-0`}
       />
-      {/* Main figure (deep royal blue) */}
-      <circle cx="9.5" cy="6" r="3.2" fill="#464EB8" />
-      <path
-        d="M14.5 11.5H4.5A2.5 2.5 0 0 0 2 14v4a2 2 0 0 0 2 2h10.5a2 2 0 0 0 2-2v-4a2.5 2.5 0 0 0-2-2.5z"
-        fill="#464EB8"
+    );
+  },
+  Slack: ({ className = 'w-6 h-6' }: { className?: string } = {}) => {
+    const hasColor = /text-/.test(className);
+    return (
+      <BsSlack
+        className={`${className} ${hasColor ? '' : 'text-[#ECB22E]'} shrink-0`}
       />
-      {/* Front 'T' shield tile */}
-      <rect x="2.5" y="10" width="11" height="11" rx="2.5" fill="#7B83EB" />
-      <path
-        d="M10.8 12.5H5.2v1.5h1.9v5.2h1.6v-5.2h1.9v-1.5z"
-        fill="#FFFFFF"
+    );
+  },
+  Notion: ({ className = 'w-6 h-6' }: { className?: string } = {}) => {
+    const hasColor = /text-/.test(className);
+    return (
+      <SiNotion
+        className={`${className} ${hasColor ? '' : 'text-white'} shrink-0`}
       />
-    </svg>
-  ),
-  Slack: ({ className = 'w-6 h-6' }: { className?: string } = {}) => (
-    <svg viewBox="0 0 24 24" className={`${className} shrink-0`} fill="none">
-      <path
-        d="M5.042 15.165a2.528 2.528 0 0 1-2.52-2.523 2.52 2.52 0 0 1 2.52-2.52h2.52v2.52c0 1.394-1.127 2.523-2.52 2.523z"
-        fill="#E01E5A"
+    );
+  },
+  GitHub: ({ className = 'w-6 h-6' }: { className?: string } = {}) => {
+    const hasColor = /text-/.test(className);
+    return (
+      <SiGithub
+        className={`${className} ${hasColor ? '' : 'text-white'} shrink-0`}
       />
-      <path
-        d="M6.302 15.165a2.528 2.528 0 0 1 2.52-2.523 2.52 2.52 0 0 1 2.52 2.523v6.315a2.528 2.528 0 0 1-2.52 2.52 2.52 2.52 0 0 1-2.52-2.52v-6.315z"
-        fill="#E01E5A"
+    );
+  },
+  Discord: ({ className = 'w-6 h-6' }: { className?: string } = {}) => {
+    const hasColor = /text-/.test(className);
+    return (
+      <SiDiscord
+        className={`${className} ${hasColor ? '' : 'text-[#5865F2]'} shrink-0`}
       />
-      <path
-        d="M8.822 5.042a2.528 2.528 0 0 1-2.52-2.52 2.52 2.52 0 0 1 2.52-2.522 2.52 2.52 0 0 1 2.52 2.522v2.52H8.822z"
-        fill="#36C5F0"
-      />
-      <path
-        d="M8.822 6.302a2.528 2.528 0 0 1 2.52 2.52 2.52 2.52 0 0 1-2.52 2.52H2.507A2.528 2.528 0 0 1-.013 8.822a2.52 2.52 0 0 1 2.52-2.52h6.315z"
-        fill="#36C5F0"
-      />
-      <path
-        d="M18.958 8.822a2.528 2.528 0 0 1 2.52 2.52 2.52 2.52 0 0 1-2.52 2.523h-2.52v-2.523c0-1.393 1.127-2.52 2.52-2.52z"
-        fill="#2EB67D"
-      />
-      <path
-        d="M17.698 8.822a2.528 2.528 0 0 1-2.52 2.52 2.52 2.52 0 0 1-2.52-2.52V2.507A2.528 2.528 0 0 1 15.178-.013a2.52 2.52 0 0 1 2.52 2.52v6.315z"
-        fill="#2EB67D"
-      />
-      <path
-        d="M15.178 18.958a2.528 2.528 0 0 1 2.52 2.52 2.52 2.52 0 0 1 2.52 2.522 2.52 2.52 0 0 1-2.52-2.522v-2.52h2.52z"
-        fill="#ECB22E"
-      />
-      <path
-        d="M15.178 17.698a2.528 2.528 0 0 1-2.52-2.52 2.52 2.52 0 0 1 2.52-2.52h6.315a2.528 2.528 0 0 1 2.52 2.52 2.52 2.52 0 0 1-2.52 2.52h-6.315z"
-        fill="#ECB22E"
-      />
-    </svg>
-  ),
-  Notion: ({ className = 'w-6 h-6' }: { className?: string } = {}) => (
-    <svg viewBox="0 0 24 24" className={`${className} shrink-0`} fill="none">
-      <rect x="2" y="2" width="20" height="20" rx="4.5" fill="#FFFFFF" />
-      <path
-        d="M6.3 6.1c.5.4.7.4 1.7.3l8-.6c.8-.1 1.1.2 1 .9l-1.3 7c-.2.8-.5 1.1-1.3 1.2l-8.3.5c-.8.1-1.1-.3-1-1.1l1.3-7c.1-.8.4-1.2 1.4-1.2zm2.1 2l-1 5.3 1.2-.1 1-5.3-1.2.1zm3.5-.3l-2.3.2-.2 1 1-.1 1.3 3-.3 1.6 1.9-.1.3-1.6-1.2-3 1-.1.2-1-1.6.1zm2.8-.2l-1 5.3 1.2-.1 1-5.3-1.2.1z"
-        fill="#000000"
-      />
-    </svg>
-  ),
-  GitHub: ({ className = 'w-6 h-6' }: { className?: string } = {}) => (
-    <svg viewBox="0 0 24 24" className={`${className} shrink-0`} fill="currentColor">
-      <path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"
-      />
-    </svg>
-  ),
-  Discord: ({ className = 'w-6 h-6' }: { className?: string } = {}) => (
-    <svg viewBox="0 0 24 24" className={`${className} shrink-0`} fill="#5865F2">
-      <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z" />
-    </svg>
-  ),
+    );
+  },
   Google: ({ className = 'w-6 h-6' }: { className?: string } = {}) => (
-    <svg viewBox="0 0 24 24" className={`${className} shrink-0`} fill="none">
-      <path
-        d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
-        fill="#4285F4"
-      />
-      <path
-        d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"
-        fill="#34A853"
-      />
-      <path
-        d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"
-        fill="#FBBC05"
-      />
-      <path
-        d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"
-        fill="#EA4335"
-      />
-    </svg>
+    <FcGoogle className={`${className} shrink-0`} />
   ),
   Composio: ({ className = 'w-6 h-6' }: { className?: string } = {}) => (
     <svg viewBox="0 0 32 32" className={`${className} shrink-0`} fill="none">

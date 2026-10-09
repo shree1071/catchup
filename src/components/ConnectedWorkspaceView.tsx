@@ -123,7 +123,7 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         'Local-first ephemeral AI processing: Zero raw message cloud retention',
       ],
       oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/slack?source=mcp',
-      icon: <PlatformIcons.Slack className="w-6 h-6" />,
+      icon: <PlatformIcons.Slack className="w-6 h-6 text-white" />,
     },
     {
       id: 'teams',
@@ -142,7 +142,7 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         'Zero-retention: Secure local-first processing on Groq LPUs',
       ],
       oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/microsoft_teams?source=mcp',
-      icon: <PlatformIcons.Teams className="w-6 h-6" />,
+      icon: <PlatformIcons.Teams className="w-6 h-6 text-white" />,
     },
     {
       id: 'notion',
@@ -161,7 +161,7 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         'Local-first reading: Zero cloud data retention',
       ],
       oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/notion?source=mcp',
-      icon: <PlatformIcons.Notion className="w-6 h-6" />,
+      icon: <PlatformIcons.Notion className="w-6 h-6 text-white" />,
     },
     {
       id: 'google',
@@ -192,7 +192,7 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         'Read incident triage and alert channels',
       ],
       oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/discord?source=mcp',
-      icon: <PlatformIcons.Discord className="w-6 h-6" />,
+      icon: <PlatformIcons.Discord className="w-6 h-6 text-white" />,
     },
     {
       id: 'github',
@@ -208,7 +208,7 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         'Read deployment and release status tags',
       ],
       oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/github?source=mcp',
-      icon: <PlatformIcons.GitHub className="w-6 h-6" />,
+      icon: <PlatformIcons.GitHub className="w-6 h-6 text-white" />,
     },
   ];
 
