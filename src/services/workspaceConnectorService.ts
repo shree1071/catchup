@@ -39,7 +39,7 @@ export interface TeamsMessage {
   isActionable?: boolean;
 }
 
-const COMPOSIO_API_KEY = 'ck__9DzbdkSNZy49BvHcVyA';
+const COMPOSIO_API_KEY = import.meta.env?.VITE_COMPOSIO_API_KEY || '';
 const COMPOSIO_ENDPOINT = 'https://connect.composio.dev/mcp';
 
 // =========================================================================
@@ -332,7 +332,8 @@ export function getNotionRecent50Updates(): NotionItem[] {
   for (let cycle = 0; cycle < 5; cycle++) {
     for (let i = 0; i < specs.length; i++) {
       const s = specs[i];
-      const author = authors[(i + cycle) % authors.length];
+      if (!s) continue;
+      const author = authors[(i + cycle) % authors.length] || '';
       const minutesAgo = (cycle * 10 + i) * 12 + 5;
       const timeStr = minutesAgo < 60 ? `${minutesAgo}m ago` : `${Math.floor(minutesAgo / 60)}h ${minutesAgo % 60}m ago`;
       result.push({
@@ -371,6 +372,7 @@ export function getTeamsRecent50Messages(): TeamsMessage[] {
   for (let cycle = 0; cycle < 5; cycle++) {
     for (let i = 0; i < baseMessages.length; i++) {
       const b = baseMessages[i];
+      if (!b) continue;
       const minutesAgo = (cycle * 10 + i) * 8 + 3;
       const timeStr = minutesAgo < 60 ? `${minutesAgo}m ago` : `${Math.floor(minutesAgo / 60)}h ${minutesAgo % 60}m ago`;
       result.push({
@@ -413,6 +415,9 @@ export function getSlackRecent50Messages(liveHeadMessages: LiveMessage[] = []): 
     const ch = channels[idx % channels.length];
     const author = authors[idx % authors.length];
     const text = templates[idx % templates.length];
+    
+    if (!ch || !author || !text) continue;
+
     const minutesAgo = idx * 9 + 4;
     const timeFormatted = minutesAgo < 60 ? `${minutesAgo}m ago` : `${Math.floor(minutesAgo / 60)}h ${minutesAgo % 60}m ago`;
 

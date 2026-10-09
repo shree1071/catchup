@@ -1,4 +1,4 @@
-const COMPOSIO_API_KEY = process.env.VITE_COMPOSIO_API_KEY || process.env.COMPOSIO_API_KEY || 'ck__9DzbdkSNZy49BvHcVyA';
+const COMPOSIO_API_KEY = process.env.COMPOSIO_API_KEY || process.env.VITE_COMPOSIO_API_KEY;
 const COMPOSIO_ENDPOINT = 'https://connect.composio.dev/mcp';
 
 async function callComposioMcpTool(name, args) {
@@ -38,6 +38,16 @@ export default async function handler(req, res) {
     return res.status(200).end();
   }
 
+  // Input validation: reject oversized request bodies
+  if (req.headers['content-length'] && parseInt(req.headers['content-length'], 10) > 10240) {
+    return res.status(413).json({ success: false, error: 'Request body too large' });
+  }
+
+  // Validate API key is configured
+  if (!COMPOSIO_API_KEY) {
+    return res.status(503).json({ success: false, error: 'Composio API key not configured. Set COMPOSIO_API_KEY environment variable.' });
+  }
+
   const { searchParams } = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
   const action = searchParams.get('action');
 
@@ -56,8 +66,10 @@ export default async function handler(req, res) {
         google_workspace: 'googlecalendar',
         googlecalendar: 'googlecalendar',
       };
-      const targetSlug = slugMap[toolkit] || toolkit;
-
+      const targetSlug = slugMap[toolkit];
+      if (!targetSlug) {
+        return res.status(400).json({ success: false, error: `Unsupported toolkit: ${toolkit}. Supported: ${Object.keys(slugMap).join(', ')}` });
+      }
       const mcpRes = await callComposioMcpTool('COMPOSIO_MANAGE_CONNECTIONS', {
         toolkits: [{ action: 'add', name: targetSlug }],
       });
@@ -95,6 +107,9 @@ export default async function handler(req, res) {
 
     if (action === 'messages' || req.url.includes('/messages')) {
       const channelId = searchParams.get('channel') || 'C0BBUP1LEJH';
+      if (!/^[A-Z0-9]+$/i.test(channelId)) {
+        return res.status(400).json({ success: false, error: 'Invalid channel ID format' });
+      }
       const mcpRes = await callComposioMcpTool('COMPOSIO_MULTI_EXECUTE_TOOL', {
         tools: [
           {
@@ -109,14 +124,19 @@ export default async function handler(req, res) {
 
     if (req.method === 'POST') {
       const { channel = 'C0BBUP1LEJH', text } = req.body || {};
-      if (!text) {
-        return res.status(400).json({ success: false, error: 'Text required' });
+      if (!text || typeof text !== 'string') {
+        return res.status(400).json({ success: false, error: 'Text required and must be a string' });
       }
+      if (text.length > 4000) {
+        return res.status(400).json({ success: false, error: 'Message too long. Maximum 4000 characters.' });
+      }
+      // Sanitize: strip potential script injection
+      const sanitizedText = text.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '').trim();
       const mcpRes = await callComposioMcpTool('COMPOSIO_MULTI_EXECUTE_TOOL', {
         tools: [
           {
             tool_slug: 'SLACK_SEND_MESSAGE',
-            arguments: { channel, markdown_text: text },
+            arguments: { channel, markdown_text: sanitizedText },
           },
         ],
       });
@@ -138,6 +158,7 @@ export default async function handler(req, res) {
       },
     });
   } catch (err) {
-    return res.status(500).json({ success: false, error: err.message });
+    console.error('[Composio API Error]', err.message);
+    return res.status(500).json({ success: false, error: 'Internal server error. Please try again.' });
   }
 }
