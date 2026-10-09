@@ -42,6 +42,38 @@ export default async function handler(req, res) {
   const action = searchParams.get('action');
 
   try {
+    // Generate fresh non-expired OAuth / App connection link
+    if (action === 'connect' || req.url.includes('/connect')) {
+      const toolkit = searchParams.get('toolkit') || (req.body && req.body.toolkit) || 'slack';
+      const slugMap = {
+        teams: 'microsoft_teams',
+        microsoft_teams: 'microsoft_teams',
+        slack: 'slack',
+        notion: 'notion',
+        github: 'github',
+        discord: 'discord',
+        google: 'googlecalendar',
+        google_workspace: 'googlecalendar',
+        googlecalendar: 'googlecalendar',
+      };
+      const targetSlug = slugMap[toolkit] || toolkit;
+
+      const mcpRes = await callComposioMcpTool('COMPOSIO_MANAGE_CONNECTIONS', {
+        toolkits: [{ action: 'add', name: targetSlug }],
+      });
+
+      const redirectUrl =
+        mcpRes.data?.data?.results?.[targetSlug]?.redirect_url ||
+        mcpRes.data?.results?.[targetSlug]?.redirect_url ||
+        `https://dashboard.composio.dev/~/org/connect/apps/${targetSlug}?source=mcp`;
+
+      return res.status(200).json({
+        success: true,
+        toolkit: targetSlug,
+        redirectUrl,
+      });
+    }
+
     if (action === 'channels' || req.url.includes('/channels')) {
       const mcpRes = await callComposioMcpTool('COMPOSIO_MULTI_EXECUTE_TOOL', {
         tools: [

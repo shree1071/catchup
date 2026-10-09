@@ -24,6 +24,8 @@ import {
   Search,
 } from 'lucide-react';
 import { sendGroqChat } from '../services/groqService';
+import { MarkdownMessage } from './MarkdownMessage';
+import { PlatformIcons } from './ComposioConnectSection';
 import {
   fetchLiveChannels,
   fetchLiveMessages,
@@ -36,6 +38,7 @@ import {
   getTeamsRecent50Messages,
   getSlackRecent50Messages,
   format50ItemsPromptContext,
+  getFreshComposioAuthUrl,
   type LiveMessage,
   type SlackChannel,
   type UserSessionState,
@@ -334,17 +337,30 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
     },
   ]);
 
-  // Handle OAuth Connection & Session Persistence
-  const toggleAppConnection = (appId: string) => {
+  // Dynamic OAuth connecting state
+  const [connectingAppId, setConnectingAppId] = useState<string | null>(null);
+
+  // Handle OAuth Connection & Session Persistence with Live Non-Expiring Links
+  const toggleAppConnection = async (appId: string) => {
     const isNowConnected = !session.connectedApps.includes(appId);
     let nextConnected = [...session.connectedApps];
 
     if (isNowConnected) {
-      nextConnected.push(appId);
-      const targetApp = apps.find((a) => a.id === appId);
-      if (targetApp?.oauthUrl) {
-        window.open(targetApp.oauthUrl, '_blank', 'noopener,noreferrer');
+      setConnectingAppId(appId);
+      try {
+        const freshUrl = await getFreshComposioAuthUrl(appId);
+        window.open(freshUrl, '_blank', 'noopener,noreferrer');
+      } catch (err) {
+        console.warn('Error obtaining fresh auth link:', err);
+        const targetApp = apps.find((a) => a.id === appId);
+        if (targetApp?.oauthUrl) {
+          window.open(targetApp.oauthUrl, '_blank', 'noopener,noreferrer');
+        }
+      } finally {
+        setConnectingAppId(null);
       }
+
+      nextConnected.push(appId);
       // Immediately open 50-item digest modal for instant visibility!
       if (appId === 'notion' || appId === 'teams' || appId === 'slack') {
         open50ItemDigest(appId as any);
@@ -1180,7 +1196,7 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
                     <span>{item.time}</span>
                   </div>
                   <div className="text-[13px] text-[#ffffff]/90 leading-relaxed font-['Inter']">
-                    {item.a}
+                    <MarkdownMessage content={item.a} />
                   </div>
                 </div>
               ))}

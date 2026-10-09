@@ -27,6 +27,7 @@ import {
   ShieldCheck,
   RefreshCw,
 } from 'lucide-react';
+import { MarkdownMessage } from './MarkdownMessage';
 import {
   sendGroqChat,
   GROQ_MODELS,
@@ -273,16 +274,30 @@ Still open:
 Live Workspace Context:
 ${contextText}
 
-CRITICAL FORMATTING INSTRUCTIONS:
-1. When user asks what is happening ("whats happening", "whats ahapenibng", "what happened", "summarize", etc.):
-   - First state the direct status of the workspace (e.g. "Nothing new in inmodel. Both channels have no messages since the last check." or mention recent live activity).
+CRITICAL FORMATTING & PRESENTATION INSTRUCTIONS:
+1. When asked about active channels, workspace structure, or comparative lists:
+   - Always present them in a clean GitHub-Flavored Markdown table with headers:
+| Channel | Members | Focus / Status |
+|:---|:---:|:---|
+| #all-inmodel | 2 | General announcements & real-time sync |
+| #inmodel-sales-deals | 2 | Deal updates & enterprise customer pipeline |
+| #new-channel | 2 | Team discussions & cross-functional topics |
+| #social | 2 | Team watercooler & informal updates |
+   - Follow with a concise, factual 1-2 sentence executive overview.
+
+2. When user asks what is happening ("whats happening", "whats ahapenibng", "what happened", "summarize", etc.):
+   - First state the direct status of the workspace (e.g. "Nothing new in inmodel. Channels have no new unread messages since the last sync." or mention recent live activity).
    - Then provide a clean, readable section:
 Still open:
-• [Action item, discovery call, client demo, or pending task]
-• [Next key priority with person/deadline]
-• [Next key item]
+• Northwind Traders has been silent for 9 days, and Rahul is following up.
+• Initech has a discovery call Tuesday at 11 AM.
+• Sales quota is at 78% with 3 weeks left.
+• Security training is due by the end of next week.
 
-2. Match the clean, direct, executive tone of Claude: helpful, concise, well-formatted, and completely factual based on the workspace context.`,
+3. Formatting standards:
+   - Always use standard GitHub-Flavored Markdown: clean tables (\`| Col 1 | Col 2 |\`), bold titles (\`**Title**\`), and bullet lists.
+   - Use channel tags like \`#all-inmodel\` and user handles like \`@shreeharshastark\`.
+   - Match the clean, direct, executive tone of Claude: helpful, concise, well-formatted, and completely factual based on the workspace context.`,
       });
 
       const assistantMessage: ChatMessage = {
@@ -840,9 +855,9 @@ Still open:
                       </div>
                     )}
 
-                    {/* Assistant Message Body (Clean typography like Claude) */}
-                    <div className="w-full text-[15px] sm:text-[16px] text-[#ffffff] leading-[1.68] font-['Inter'] whitespace-pre-line selection:bg-[#ff6363]/30">
-                      {msg.content}
+                    {/* Assistant Message Body (Clean typography + GFM Tables & Channel Badges) */}
+                    <div className="w-full">
+                      <MarkdownMessage content={msg.content} />
                     </div>
 
                     {/* Action Strip: Copy, Audio, Thumbs, Regenerate */}

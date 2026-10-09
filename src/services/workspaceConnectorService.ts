@@ -135,6 +135,52 @@ export async function callComposioBrowserMcp(name: string, args: Record<string, 
   }
 }
 
+// Dynamically generate a fresh, non-expired Composio OAuth authorization link
+export async function getFreshComposioAuthUrl(appId: string): Promise<string> {
+  const slugMap: Record<string, string> = {
+    teams: 'microsoft_teams',
+    microsoft_teams: 'microsoft_teams',
+    slack: 'slack',
+    notion: 'notion',
+    github: 'github',
+    discord: 'discord',
+    google: 'googlecalendar',
+    google_workspace: 'googlecalendar',
+  };
+  const slug = slugMap[appId] || appId;
+
+  // 1. Try Vercel Serverless Endpoint
+  try {
+    const res = await fetch(`/api/composio?action=connect&toolkit=${slug}`);
+    if (res.ok) {
+      const data = await res.json();
+      if (data.redirectUrl) {
+        return data.redirectUrl;
+      }
+    }
+  } catch (e) {
+    // continue to browser MCP
+  }
+
+  // 2. Try direct browser Composio MCP
+  try {
+    const mcpRes = await callComposioBrowserMcp('COMPOSIO_MANAGE_CONNECTIONS', {
+      toolkits: [{ action: 'add', name: slug }],
+    });
+    const redirectUrl =
+      mcpRes?.data?.results?.[slug]?.redirect_url ||
+      mcpRes?.results?.[slug]?.redirect_url;
+    if (redirectUrl) {
+      return redirectUrl;
+    }
+  } catch (e) {
+    // fallback
+  }
+
+  // 3. Fallback to permanent direct Composio connection dashboard (guaranteed valid, never expires)
+  return `https://dashboard.composio.dev/~/org/connect/apps/${slug}?source=mcp`;
+}
+
 // Channels
 export async function fetchLiveChannels(): Promise<SlackChannel[]> {
   try {

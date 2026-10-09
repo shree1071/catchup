@@ -91,38 +91,84 @@ export const Hero: React.FC<HeroProps> = ({
         </div>
 
         {/* Unified Composio Platform Integrations Strip */}
-        <div className="mt-10 sm:mt-12 w-full max-w-[840px] flex flex-col items-center text-center">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#111214] border border-[#27282b] text-[11px] font-['GeistMono'] text-[#9c9c9d] uppercase tracking-[0.08em] mb-3.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-[#ff6363] animate-pulse" />
-            <span>Connect Once via Composio • Autonomous AI Ingestion</span>
-          </div>
+        <div className="mt-10 sm:mt-12 w-full max-w-[880px] flex flex-col items-center text-center">
+          {/* Top Announcement Pill */}
+          <button
+            onClick={onOpenConnectWorkspace}
+            className="group relative inline-flex items-center gap-2.5 px-4 py-1.5 rounded-full bg-[#0d0f14]/90 hover:bg-[#141721] border border-[#262836] hover:border-[#ff6363]/50 transition-all duration-300 shadow-[0_0_24px_rgba(255,99,99,0.12)] backdrop-blur-xl cursor-pointer mb-4"
+          >
+            <span className="relative flex h-2 w-2">
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#ff6363] opacity-75" />
+              <span className="relative inline-flex rounded-full h-2 w-2 bg-[#ff6363] shadow-[0_0_6px_#ff6363]" />
+            </span>
+            <span className="text-[10px] font-['GeistMono'] font-bold uppercase tracking-wider text-[#ff7575] bg-[#ff6363]/12 border border-[#ff6363]/25 px-2 py-0.5 rounded-full">
+              OAUTH 2.0
+            </span>
+            <span className="text-[12px] font-['Inter'] font-medium text-[#d4d6e0] tracking-tight group-hover:text-[#ffffff] transition-colors">
+              CONNECT ONCE VIA COMPOSIO • AUTONOMOUS AI INGESTION
+            </span>
+            <span className="text-[12px] text-[#ff6363] opacity-70 group-hover:opacity-100 group-hover:translate-x-0.5 transition-all">
+              →
+            </span>
+          </button>
 
+          {/* Platform Logos Pill Bar */}
           <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5">
             {[
-              { id: 'teams', name: 'Microsoft Teams', Icon: PlatformIcons.Teams },
-              { id: 'slack', name: 'Slack', Icon: PlatformIcons.Slack },
-              { id: 'notion', name: 'Notion', Icon: PlatformIcons.Notion },
-              { id: 'github', name: 'GitHub', Icon: PlatformIcons.GitHub },
-              { id: 'discord', name: 'Discord', Icon: PlatformIcons.Discord },
-              { id: 'google', name: 'Google Workspace', Icon: PlatformIcons.Google },
-            ].map(({ id, name, Icon }) => (
+              {
+                id: 'teams',
+                name: 'Microsoft Teams',
+                Icon: PlatformIcons.Teams,
+                hoverClass: 'hover:border-[#505AC9]/50 hover:shadow-[0_4px_20px_rgba(80,90,201,0.22)]',
+              },
+              {
+                id: 'slack',
+                name: 'Slack',
+                Icon: PlatformIcons.Slack,
+                hoverClass: 'hover:border-[#E01E5A]/50 hover:shadow-[0_4px_20px_rgba(224,30,90,0.22)]',
+              },
+              {
+                id: 'notion',
+                name: 'Notion',
+                Icon: PlatformIcons.Notion,
+                hoverClass: 'hover:border-[#ffffff]/40 hover:shadow-[0_4px_20px_rgba(255,255,255,0.12)]',
+              },
+              {
+                id: 'github',
+                name: 'GitHub',
+                Icon: PlatformIcons.GitHub,
+                hoverClass: 'hover:border-[#9c9c9d]/40 hover:shadow-[0_4px_20px_rgba(255,255,255,0.1)]',
+              },
+              {
+                id: 'discord',
+                name: 'Discord',
+                Icon: PlatformIcons.Discord,
+                hoverClass: 'hover:border-[#5865F2]/50 hover:shadow-[0_4px_20px_rgba(88,101,242,0.22)]',
+              },
+              {
+                id: 'google',
+                name: 'Google Workspace',
+                Icon: PlatformIcons.Google,
+                hoverClass: 'hover:border-[#4285F4]/50 hover:shadow-[0_4px_20px_rgba(66,133,244,0.22)]',
+              },
+            ].map(({ id, name, Icon, hoverClass }) => (
               <button
                 key={id}
                 onClick={onOpenConnectWorkspace}
-                className="flex items-center gap-2 px-3 py-1.5 rounded-[8px] bg-[#0c0d10] hover:bg-[#16171d] border border-[#27282b] hover:border-[#ff6363]/40 transition-all cursor-pointer shadow-sm group shrink-0"
+                className={`flex items-center gap-2.5 px-3.5 py-2 rounded-[10px] bg-[#0c0d12]/90 hover:bg-[#141620] border border-[#232532] ${hoverClass} transition-all duration-200 cursor-pointer shadow-sm group shrink-0 hover:-translate-y-0.5 active:translate-y-0`}
                 title={`Connect ${name} via Composio`}
               >
-                <div className="w-4 h-4 shrink-0 flex items-center justify-center transition-transform group-hover:scale-110">
-                  <Icon className="w-4 h-4" />
+                <div className="w-[18px] h-[18px] shrink-0 flex items-center justify-center transition-transform group-hover:scale-110">
+                  <Icon className="w-[18px] h-[18px]" />
                 </div>
-                <span className="font-['Inter'] text-[12px] font-medium text-[#cccccc] group-hover:text-[#ffffff]">
+                <span className="font-['Inter'] text-[13px] font-medium text-[#d4d6e0] group-hover:text-[#ffffff] transition-colors">
                   {name}
                 </span>
               </button>
             ))}
           </div>
 
-          <p className="mt-3 text-[12px] font-['Inter'] text-[#6a6b6c]">
+          <p className="mt-3.5 text-[12px] font-['Inter'] text-[#7a7b82]">
             We connect to your platforms so you don't have to read unread chats yourself.
           </p>
         </div>
