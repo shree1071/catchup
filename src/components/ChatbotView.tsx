@@ -123,7 +123,7 @@ Still open:
   ]);
 
   const [activeThreadId, setActiveThreadId] = useState<string>('thread-1');
-  const activeThread = threads.find((t) => t.id === activeThreadId) || threads[0];
+  const activeThread = threads.find((t) => t.id === activeThreadId) || threads[0]!;
 
   // Active Model & Integrations
   const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-oss-20b');

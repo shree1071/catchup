@@ -164,6 +164,8 @@ export const TriageComparisonSection: React.FC<TriageComparisonSectionProps> = (
     }));
   };
 
+  if (!activeChannel) return null;
+
   return (
     <section id="triage-demo" className="w-full max-w-[1200px] mx-auto px-4 sm:px-6 py-16 sm:py-24 border-t border-[#1b1c1e]">
       {/* Section Header */}

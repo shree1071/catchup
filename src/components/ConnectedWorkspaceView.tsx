@@ -265,7 +265,7 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
     },
   ];
 
-  const [selectedSource, setSelectedSource] = useState<SourceOption>(dynamicSources[0]);
+  const [selectedSource, setSelectedSource] = useState<SourceOption>(dynamicSources[0]!);
   const [isRawExpanded, setIsRawExpanded] = useState<boolean>(false);
 
   // Summarization State
@@ -806,7 +806,7 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
                           </span>
                         </div>
                         <div className="text-[11px] font-['GeistMono'] text-[#cccccc] bg-[#07080a] p-2 rounded border border-[#1b1c1e] max-h-[60px] overflow-y-auto leading-relaxed">
-                          {liveMessages.length > 0 ? (
+                          {liveMessages.length > 0 && liveMessages[0] ? (
                             <span>{liveMessages[0].text}</span>
                           ) : (
                             <span>🚀 Antigravity AI Copilot connected to inmodel workspace! Real-time message sync is active.</span>

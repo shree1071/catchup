@@ -66,14 +66,15 @@ export const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ content, class
 
     while (i < lines.length) {
       const line = lines[i];
+      if (line === undefined) { i++; continue; }
 
       // Code Block fence ```
       if (line.trim().startsWith('```')) {
         const lang = line.trim().slice(3).trim() || 'code';
         const codeLines: string[] = [];
         i++;
-        while (i < lines.length && !lines[i].trim().startsWith('```')) {
-          codeLines.push(lines[i]);
+        while (i < lines.length && !lines[i]!.trim().startsWith('```')) {
+          codeLines.push(lines[i]!);
           i++;
         }
         i++; // skip closing ```
@@ -114,12 +115,12 @@ export const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ content, class
       // Markdown Table (| col1 | col2 |)
       if (line.trim().startsWith('|') && line.trim().endsWith('|')) {
         const tableLines: string[] = [];
-        while (i < lines.length && lines[i].trim().startsWith('|') && lines[i].trim().endsWith('|')) {
-          tableLines.push(lines[i]);
+        while (i < lines.length && lines[i]!.trim().startsWith('|') && lines[i]!.trim().endsWith('|')) {
+          tableLines.push(lines[i]!);
           i++;
         }
         if (tableLines.length >= 2) {
-          const headerCells = tableLines[0]
+          const headerCells = tableLines[0]!
             .split('|')
             .slice(1, -1)
             .map((c) => c.trim());
@@ -220,8 +221,8 @@ export const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ content, class
       // Unordered List bullet points (•, -, *)
       if (/^(\s*[-*•])\s+/.test(line)) {
         const listItems: string[] = [];
-        while (i < lines.length && /^(\s*[-*•])\s+/.test(lines[i])) {
-          listItems.push(lines[i].replace(/^(\s*[-*•])\s+/, ''));
+        while (i < lines.length && /^(\s*[-*•])\s+/.test(lines[i]!)) {
+          listItems.push(lines[i]!.replace(/^(\s*[-*•])\s+/, ''));
           i++;
         }
         elements.push(
@@ -239,8 +240,8 @@ export const MarkdownMessage: React.FC<MarkdownMessageProps> = ({ content, class
       // Ordered list 1. 2.
       if (/^\s*\d+\.\s+/.test(line)) {
         const listItems: string[] = [];
-        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i])) {
-          listItems.push(lines[i].replace(/^\s*\d+\.\s+/, ''));
+        while (i < lines.length && /^\s*\d+\.\s+/.test(lines[i]!)) {
+          listItems.push(lines[i]!.replace(/^\s*\d+\.\s+/, ''));
           i++;
         }
         elements.push(

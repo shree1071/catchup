@@ -208,7 +208,7 @@ export function extractReasoningFromContent(rawText: string): {
 } {
   const thinkMatch = rawText.match(/<think>([\s\S]*?)<\/think>/i);
   if (thinkMatch) {
-    const reasoning = thinkMatch[1].trim();
+    const reasoning = thinkMatch[1]!.trim();
     const content = rawText.replace(/<think>[\s\S]*?<\/think>/i, '').trim();
     return { content, reasoning };
   }
@@ -846,7 +846,7 @@ export const summarizeTeamsChat = summarizeTeamsChatWithGroq;
 function localHeuristicSummarizer(
   chat: string,
   channelName: string,
-  unreadCount: number,
+  _unreadCount: number,
   latencyMs: number
 ): TeamsCatchUpSummary {
   const lines = chat.split('\n').filter((l) => l.trim().length > 0);
@@ -861,7 +861,7 @@ function localHeuristicSummarizer(
     // Participant extraction
     const authorMatch = line.match(/\]\s*([^:]+):/);
     if (authorMatch) {
-      participants.add(authorMatch[1].trim());
+      participants.add(authorMatch[1]!.trim());
     }
 
     // Decisions
@@ -872,7 +872,7 @@ function localHeuristicSummarizer(
     // Mentions of @You or @you
     if (/@you/i.test(line)) {
       missedMentions.push({
-        author: authorMatch ? authorMatch[1].trim() : 'Colleague',
+        author: authorMatch ? authorMatch[1]!.trim() : 'Colleague',
         message: line.replace(/^\[[^\]]+\]\s*/, '').trim(),
         timestamp: line.match(/\[([^\]]+)\]/)?.[1] || 'Just now',
         urgency: /urgent|asap|today|deadline/i.test(line) ? 'high' : 'medium',
@@ -893,7 +893,7 @@ function localHeuristicSummarizer(
       actionItems.push({
         id: `local-act-${idx}`,
         task: line.replace(/^\[[^\]]+\]\s*[^:]+:\s*/, '').trim(),
-        assignee: /@you/i.test(line) ? 'You' : authorMatch ? authorMatch[1].trim() : 'Team',
+        assignee: /@you/i.test(line) ? 'You' : authorMatch ? authorMatch[1]!.trim() : 'Team',
         priority: /urgent|spike|500|error|fail/i.test(line) ? 'P0' : 'P1',
         completed: false,
       });
@@ -902,6 +902,7 @@ function localHeuristicSummarizer(
 
   return {
     channelName,
+    unreadCount: _unreadCount,
     totalMessages: lines.length,
     urgencyLevel: actionItems.some((a) => a.priority === 'P0')
       ? 'P0 - Critical'

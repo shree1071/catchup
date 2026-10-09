@@ -139,6 +139,7 @@ export const TeamsCatchUpModal: React.FC<TeamsCatchUpModalProps> = ({
   }, [isOpen, selectedChannelId, isCustomMode, customChatText, aiProvider, selectedOllamaModel, customModelInput]);
 
   const handleRunSummary = async () => {
+    if (!activeChannel) return;
     setIsProcessing(true);
     const contentToAnalyze = isCustomMode ? customChatText : activeChannel.chat;
     const channelName = isCustomMode ? 'Custom Teams Chat' : activeChannel.name;
@@ -465,7 +466,7 @@ export const TeamsCatchUpModal: React.FC<TeamsCatchUpModalProps> = ({
                     : 'text-[#9c9c9d] hover:text-[#ffffff]'
                 }`}
               >
-                Raw Feed ({isCustomMode ? 'Custom' : activeChannel.unreadCount})
+                Raw Feed ({isCustomMode ? 'Custom' : activeChannel?.unreadCount})
               </button>
             </div>
 
@@ -500,10 +501,10 @@ export const TeamsCatchUpModal: React.FC<TeamsCatchUpModalProps> = ({
                   }`} />
                   <span className="font-['Inter'] text-[14px] text-[#ffffff] font-medium">
                     {aiProvider === 'ollama'
-                      ? `Local Ollama is analyzing ${activeChannel.unreadCount} unread Teams messages...`
+                      ? `Local Ollama is analyzing ${activeChannel?.unreadCount} unread Teams messages...`
                       : aiProvider === 'local'
-                      ? `Deterministic heuristic parser analyzing ${activeChannel.unreadCount} messages...`
-                      : `Groq LPU is analyzing ${activeChannel.unreadCount} unread Teams messages...`}
+                      ? `Deterministic heuristic parser analyzing ${activeChannel?.unreadCount} messages...`
+                      : `Groq LPU is analyzing ${activeChannel?.unreadCount} unread Teams messages...`}
                   </span>
                   <span className="font-['GeistMono'] text-[11px] text-[#6a6b6c]">
                     {aiProvider === 'ollama'
@@ -802,12 +803,12 @@ export const TeamsCatchUpModal: React.FC<TeamsCatchUpModalProps> = ({
           {activeTab === 'transcript' && (
             <div className="p-4 rounded-[10px] bg-[#0c0d11] border border-[#232427] space-y-3 font-['GeistMono'] text-[12px]">
               <div className="flex items-center justify-between pb-2 border-b border-[#1b1c1e] text-[#9c9c9d]">
-                <span>Channel: {activeChannel.name}</span>
-                <span>{activeChannel.unreadCount} unread messages</span>
+                <span>Channel: {activeChannel?.name}</span>
+                <span>{activeChannel?.unreadCount} unread messages</span>
               </div>
 
               <div className="space-y-3 text-[#dddddd] font-['Inter']">
-                {activeChannel.chat.split('\n').map((line, idx) => {
+                {activeChannel?.chat.split('\n').map((line, idx) => {
                   const isMention = /@you/i.test(line);
                   return (
                     <div

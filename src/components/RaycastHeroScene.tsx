@@ -72,6 +72,8 @@ export const RaycastHeroScene: React.FC<RaycastHeroSceneProps> = ({
     };
   }, []);
 
+  if (!activeOption) return null;
+
   return (
     <div className="absolute inset-0 overflow-hidden pointer-events-none z-0 select-none bg-[#040506]">
       {/* 1. Straight & Dark Red Ribbons (Authentic Raycast screenshot match) */}
