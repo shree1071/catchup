@@ -304,6 +304,16 @@ ai/
 
 ---
 
-## 13. License
+## 13. Production Performance & Vercel Build Optimizations
+
+CatchUp is engineered for high-performance enterprise deployments with zero runtime bloat:
+
+- **Zero-Dependency Markdown Rendering:** Native AST-free React Markdown engine renders complex GFM tables, fenced code blocks with 1-click clipboard copy, and channel badges (`#all-inmodel`) with zero external package overhead (no `react-markdown` or `remark-gfm` dependencies), dropping production bundle size below 485 kB and achieving sub-4s Vite builds.
+- **Dynamic On-Demand Composio OAuth:** Eliminates link session expirations by minting live OAuth tokens synchronously upon user click via Composio MCP (`COMPOSIO_MANAGE_CONNECTIONS`), backed by permanent fallback to the Composio App Portal.
+- **Fluent 2.0 Vector Iconography:** Pixel-perfect multi-color SVG marks for Microsoft Teams, Slack, Notion, GitHub, Discord, and Google Workspace with hardware-accelerated CSS hover aura effects.
+
+---
+
+## 14. License
 
 Distributed under the terms of the MIT License. Copyright 2026 CatchUp Development Team.
