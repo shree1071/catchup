@@ -122,12 +122,8 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         'Verify team workspace name and domain (inmodel.slack.com, ID: T0BBUNZSRL5)',
         'Local-first ephemeral AI processing: Zero raw message cloud retention',
       ],
-      oauthUrl: 'https://connect.composio.dev/link/lk_u8c23cBc0A4e',
-      icon: (
-        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
-          <path d="M5.042 15.165a2.528 2.528 0 0 1-2.52 2.523A2.528 2.528 0 0 1 0 15.165a2.527 2.527 0 0 1 2.522-2.52h2.52v2.52zM6.313 15.165a2.527 2.527 0 0 1 2.521-2.52 2.527 2.527 0 0 1 2.521 2.52v6.313A2.528 2.528 0 0 1 8.834 24a2.528 2.528 0 0 1-2.521-2.522v-6.313zM8.834 5.042a2.528 2.528 0 0 1-2.521-2.52A2.528 2.528 0 0 1 8.834 0a2.528 2.528 0 0 1 2.521 2.522v2.52H8.834zM8.834 6.313a2.528 2.528 0 0 1 2.521 2.521 2.528 2.528 0 0 1-2.521 2.521H2.522A2.528 2.528 0 0 1 0 8.834a2.528 2.528 0 0 1 2.522-2.521h6.312zM18.956 8.834a2.528 2.528 0 0 1 2.522-2.521A2.528 2.528 0 0 1 24 8.834a2.528 2.528 0 0 1-2.522 2.521h-2.522V8.834zM17.688 8.834a2.528 2.528 0 0 1-2.523 2.521 2.527 2.527 0 0 1-2.52-2.521V2.522A2.527 2.527 0 0 1 15.165 0a2.528 2.528 0 0 1 2.523 2.522v6.312zM15.165 18.956a2.528 2.528 0 0 1 2.523 2.522A2.528 2.528 0 0 1 15.165 24a2.527 2.527 0 0 1-2.52-2.522v-2.522h2.52zM15.165 17.688a2.527 2.527 0 0 1-2.52-2.523 2.527 2.527 0 0 1 2.52-2.52h6.313A2.527 2.527 0 0 1 24 15.165a2.528 2.528 0 0 1-2.522 2.523h-6.313z" fill="#ECB22E"/>
-        </svg>
-      ),
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/slack?source=mcp',
+      icon: <PlatformIcons.Slack className="w-6 h-6" />,
     },
     {
       id: 'teams',
@@ -145,12 +141,8 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         'Extract high-priority urgent tags and missed @mentions',
         'Zero-retention: Secure local-first processing on Groq LPUs',
       ],
-      oauthUrl: 'https://connect.composio.dev/link/lk_dca9N03OWzu6',
-      icon: (
-        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
-          <path d="M19.5 7.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5zm-3.5 1h7c.83 0 1.5.67 1.5 1.5v4c0 .83-.67 1.5-1.5 1.5h-.5v3.5a.5.5 0 0 1-.78.41L18 17.5h-2c-.83 0-1.5-.67-1.5-1.5v-6c0-.83.67-1.5 1.5-1.5zM9 8a3 3 0 1 0 0-6 3 3 0 0 0 0 6zm-5 2h10a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H9.5l-4.72 2.83A.5.5 0 0 1 4 23.41V21H4a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2z"/>
-        </svg>
-      ),
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/microsoft_teams?source=mcp',
+      icon: <PlatformIcons.Teams className="w-6 h-6" />,
     },
     {
       id: 'notion',
@@ -168,12 +160,8 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         'Inspect comments, task owners, and assignees (@marcus_pm, @dev_sarah)',
         'Local-first reading: Zero cloud data retention',
       ],
-      oauthUrl: 'https://connect.composio.dev/link/lk_3ew6FZejkcmf',
-      icon: (
-        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
-          <path d="M4.459 4.208c.746.606 1.026.56 2.428.466l13.215-.793c.28 0 .047-.28-.046-.326L17.86 1.782c-.466-.373-1.12-.7-2.193-.606L2.965 2.155c-.42.047-.513.327-.373.467l1.867 1.586zm.933 3.687v12.787c0 .84.42 1.12 1.307 1.073l13.728-.84c.887-.046 1.027-.606 1.027-1.26V6.822c0-.653-.327-.933-.98-.887l-14.102.84c-.653.047-.98.42-.98 1.12zm12.32 1.54c.093.42 0 .84-.42.887l-.7.14v7.933c-.467.28-1.074.467-1.587.467-.84 0-1.213-.373-1.913-1.26l-4.573-7.14v6.86l1.353.327c.42.093.467.466.374.886-.094.42-.374.513-.98.513l-3.36-.046c-.467 0-.607-.28-.513-.7.093-.42.42-.467.84-.56l.84-.187V9.761l-1.12-.093c-.42-.047-.56-.373-.467-.793.094-.42.42-.513.98-.56l3.5-.233 4.806 7.42V9.434l-1.073-.14c-.42-.047-.514-.373-.42-.793.093-.42.42-.513.98-.56l3.22-.187c.606 0 .746.28.653.7v.047z"/>
-        </svg>
-      ),
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/notion?source=mcp',
+      icon: <PlatformIcons.Notion className="w-6 h-6" />,
     },
     {
       id: 'google',
@@ -188,12 +176,8 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         'Read Google Docs specs and meeting summaries',
         'Read Google Drive spreadsheet trackers',
       ],
-      oauthUrl: 'https://connect.composio.dev/link/lk_google_connect',
-      icon: (
-        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
-          <path d="M12 5c1.6 0 3 .6 4.1 1.7l3.1-3.1C17.3 1.8 14.8 1 12 1 7.5 1 3.7 3.6 1.9 7.3l3.7 2.9C6.5 7.3 9 5 12 5zm10.9 7c0-.8-.1-1.6-.2-2.3H12v4.5h6.2c-.3 1.5-1.1 2.8-2.4 3.7l3.7 2.9c2.2-2 3.4-5 3.4-8.8zM5.6 14.8c-.2-.7-.4-1.5-.4-2.3 0-.8.1-1.6.4-2.3L1.9 7.3C.7 9.7 0 12.3 0 15.1s.7 5.4 1.9 7.8l3.7-2.9c-.3-.7-.5-1.5-.5-2.3zm6.4 8.2c2.8 0 5.3-.9 7.1-2.6l-3.7-2.9c-1 0.7-2.2 1.1-3.4 1.1-3 0-5.5-2.3-6.4-5.2L1.9 16.3C3.7 20 7.5 23 12 23z"/>
-        </svg>
-      ),
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/googlecalendar?source=mcp',
+      icon: <PlatformIcons.Google className="w-6 h-6" />,
     },
     {
       id: 'discord',
@@ -207,12 +191,8 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         'Read community developer announcements',
         'Read incident triage and alert channels',
       ],
-      oauthUrl: 'https://connect.composio.dev/link/lk_discord_connect',
-      icon: (
-        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
-          <path d="M20.317 4.37a19.791 19.791 0 0 0-4.885-1.515.074.074 0 0 0-.079.037c-.21.375-.444.864-.608 1.25a18.27 18.27 0 0 0-5.487 0 12.64 12.64 0 0 0-.617-1.25.077.077 0 0 0-.079-.037A19.736 19.736 0 0 0 3.677 4.37a.07.07 0 0 0-.032.027C.533 9.046-.32 13.58.099 18.057a.082.082 0 0 0 .031.057 19.9 19.9 0 0 0 5.993 3.03.078.078 0 0 0 .084-.028c.462-.63.874-1.295 1.226-1.994.021-.041.001-.09-.041-.106a13.107 13.107 0 0 1-1.872-.892.077.077 0 0 1-.008-.128 10.2 10.2 0 0 0 .372-.292.074.074 0 0 1 .077-.01c3.929 1.793 8.18 1.793 12.061 0a.074.074 0 0 1 .078.01c.12.098.246.198.373.292a.077.077 0 0 1-.006.127 12.299 12.299 0 0 1-1.873.894.077.077 0 0 0-.041.107c.36.698.772 1.362 1.225 1.993a.076.076 0 0 0 .084.028 19.839 19.839 0 0 0 6.002-3.03.077.077 0 0 0 .032-.054c.5-5.177-.838-9.674-3.549-13.66a.061.061 0 0 0-.031-.028zM8.02 15.33c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.956-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.956 2.418-2.157 2.418zm7.975 0c-1.183 0-2.157-1.085-2.157-2.419 0-1.333.955-2.419 2.157-2.419 1.21 0 2.176 1.096 2.157 2.42 0 1.333-.946 2.418-2.157 2.418z"/>
-        </svg>
-      ),
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/discord?source=mcp',
+      icon: <PlatformIcons.Discord className="w-6 h-6" />,
     },
     {
       id: 'github',
@@ -227,12 +207,8 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         'Read repository issue threads and milestones',
         'Read deployment and release status tags',
       ],
-      oauthUrl: 'https://connect.composio.dev/link/lk_github_connect',
-      icon: (
-        <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
-          <path fillRule="evenodd" clipRule="evenodd" d="M12 2C6.477 2 2 6.484 2 12.017c0 4.425 2.865 8.18 6.839 9.504.5.092.682-.217.682-.483 0-.237-.008-.868-.013-1.703-2.782.605-3.369-1.343-3.369-1.343-.454-1.158-1.11-1.466-1.11-1.466-.908-.62.069-.608.069-.608 1.003.07 1.53 1.032 1.53 1.032.892 1.53 2.341 1.088 2.91.832.092-.647.35-1.088.636-1.338-2.22-.253-4.555-1.113-4.555-4.951 0-1.093.39-1.988 1.029-2.688-.103-.253-.446-1.272.098-2.65 0 0 .84-.27 2.75 1.026A9.564 9.564 0 0 1 12 6.844c.85.004 1.705.115 2.504.337 1.909-1.296 2.747-1.027 2.747-1.027.546 1.379.202 2.398.1 2.651.64.7 1.028 1.595 1.028 2.688 0 3.848-2.339 4.695-4.566 4.943.359.309.678.92.678 1.855 0 1.338-.012 2.419-.012 2.747 0 .268.18.58.688.482A10.019 10.019 0 0 0 22 12.017C22 6.484 17.522 2 12 2z"/>
-        </svg>
-      ),
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/github?source=mcp',
+      icon: <PlatformIcons.GitHub className="w-6 h-6" />,
     },
   ];
 
@@ -917,13 +893,36 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
                     </button>
                   </div>
                 ) : (
-                  <button
-                    onClick={() => toggleAppConnection(app.id)}
-                    className="w-full py-2.5 px-3 rounded-[8px] bg-[#ff6363] hover:bg-[#ff7a7a] text-[#040506] font-semibold text-[12px] transition-all cursor-pointer shadow-[0_2px_12px_rgba(255,99,99,0.3)] active:scale-95 flex items-center justify-center gap-1.5"
-                  >
-                    <span>Connect with OAuth</span>
-                    <ExternalLink className="w-3.5 h-3.5" />
-                  </button>
+                  <div className="space-y-1.5">
+                    <button
+                      onClick={() => toggleAppConnection(app.id)}
+                      disabled={connectingAppId === app.id}
+                      className="w-full py-2.5 px-3 rounded-[8px] bg-[#ff6363] hover:bg-[#ff7a7a] text-[#040506] font-semibold text-[12px] transition-all cursor-pointer shadow-[0_2px_12px_rgba(255,99,99,0.3)] active:scale-95 flex items-center justify-center gap-1.5 disabled:opacity-60"
+                    >
+                      {connectingAppId === app.id ? (
+                        <>
+                          <RefreshCw className="w-3.5 h-3.5 animate-spin" />
+                          <span>Generating Live Link...</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>Connect with OAuth</span>
+                          <ExternalLink className="w-3.5 h-3.5" />
+                        </>
+                      )}
+                    </button>
+                    <div className="text-center">
+                      <a
+                        href={app.oauthUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[10px] font-['GeistMono'] text-[#6a6b6c] hover:text-[#9c9c9d] transition-colors inline-flex items-center gap-1"
+                      >
+                        <span>Direct Composio Portal</span>
+                        <ExternalLink className="w-2.5 h-2.5" />
+                      </a>
+                    </div>
+                  </div>
                 )}
               </div>
             </div>
