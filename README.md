@@ -8,7 +8,8 @@
 [![Vite](https://img.shields.io/badge/Vite-6.0-black.svg?style=flat&logo=vite)](https://vitejs.dev)
 [![Groq LPU](https://img.shields.io/badge/Groq-LPU_Inference-black.svg)](https://groq.com)
 [![Ollama](https://img.shields.io/badge/Ollama-100%25_Local_BYOM-black.svg?logo=ollama)](https://ollama.com)
-[![Vitest](https://img.shields.io/badge/Tests-20_Passed-black.svg)](https://vitest.dev)
+[![Vitest](https://img.shields.io/badge/Tests-26_Passed-black.svg)](https://vitest.dev)
+[![Prompt Blueprint](https://img.shields.io/badge/Blueprint-PROMPT.MD-black.svg)](PROMPT.MD)
 [![License](https://img.shields.io/badge/License-MIT-black.svg)](LICENSE)
 
 ---
@@ -16,6 +17,8 @@
 ## 1. Executive Summary
 
 CatchUp is an operational command-center micro-application built to solve the high cognitive overhead of asynchronous team communications ("What Did I Miss?"). 
+
+> 📘 **Master System Prompt & Architectural Blueprint**: See [`PROMPT.MD`](./PROMPT.MD) for the complete, self-contained system prompt, architecture diagrams, and operational workflows of what we built.
 
 CatchUp features a **flexible dual-engine AI architecture**:
 1. **Groq Language Processing Unit (LPU) Cloud Acceleration:** Ultra-high throughput inference delivering sub-second executive digests across massive unread backlogs.
