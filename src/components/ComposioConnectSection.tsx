@@ -8,6 +8,7 @@ import {
   Copy,
   Check,
 } from 'lucide-react';
+import { getFreshComposioAuthUrl } from '../services/workspaceConnectorService';
 
 interface ComposioConnectSectionProps {
   onOpenTeamsCatchUp?: () => void;
@@ -159,7 +160,7 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
       name: 'Microsoft Teams',
       category: 'chat' as const,
       logo: PlatformIcons.Teams,
-      oauthUrl: 'https://connect.composio.dev/link/lk_pQFDirDB0_mA',
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/microsoft_teams?source=mcp',
       unreadBadge: connectedMap['teams'] ? '38 unread' : 'OAuth Required',
       description: 'Ingest team chats & war rooms. P0 outage alerts & PR reviews isolated automatically.',
       highlight: 'Auto-Summarized via Groq LPU',
@@ -171,7 +172,7 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
       name: 'Slack',
       category: 'chat' as const,
       logo: PlatformIcons.Slack,
-      oauthUrl: 'https://connect.composio.dev/link/lk_u8c23cBc0A4e',
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/slack?source=mcp',
       unreadBadge: connectedMap['slack'] ? '19 unread' : 'OAuth Required',
       description: 'Filter missed @mentions, incident alerts, and team consensus decisions.',
       highlight: 'Decision & Mention Radar',
@@ -183,7 +184,7 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
       name: 'Notion Workspace',
       category: 'wiki' as const,
       logo: PlatformIcons.Notion,
-      oauthUrl: 'https://connect.composio.dev/link/lk_f0pnCtTxFs7s',
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/notion?source=mcp',
       unreadBadge: connectedMap['notion'] ? 'Live Sync' : 'OAuth Required',
       description: 'Auto-push synthesized action items, tasks, and deadlines into project database spec.',
       highlight: '1-Click Action Export',
@@ -195,7 +196,7 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
       name: 'GitHub',
       category: 'dev' as const,
       logo: PlatformIcons.GitHub,
-      oauthUrl: 'https://connect.composio.dev/link/lk_github_connect',
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/github?source=mcp',
       unreadBadge: connectedMap['github'] ? 'CI Blocker' : 'OAuth Required',
       description: 'Cross-reference chat code review freezes with open Pull Request approval status.',
       highlight: 'Code Freeze Tracker',
@@ -207,7 +208,7 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
       name: 'Discord Communities',
       category: 'chat' as const,
       logo: PlatformIcons.Discord,
-      oauthUrl: 'https://connect.composio.dev/link/lk_discord_connect',
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/discord?source=mcp',
       unreadBadge: connectedMap['discord'] ? 'Active' : 'OAuth Required',
       description: 'Bridge high-velocity Discord developer channels into local-first executive digests.',
       highlight: 'Composio 1-Click Link',
@@ -219,7 +220,7 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
       name: 'Google Workspace',
       category: 'dev' as const,
       logo: PlatformIcons.Google,
-      oauthUrl: 'https://connect.composio.dev/link/lk_google_connect',
+      oauthUrl: 'https://dashboard.composio.dev/~/org/connect/apps/googlecalendar?source=mcp',
       unreadBadge: connectedMap['google'] ? 'Active' : 'OAuth Required',
       description: 'Triage unread Gmail chains and upcoming milestone calendar freezes seamlessly.',
       highlight: 'Composio 1-Click Link',
@@ -232,10 +233,14 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
     (p) => filterCategory === 'all' || p.category === filterCategory
   );
 
-  const handleConnectWithOAuth = (platformId: string, platformName: string, oauthUrl: string) => {
+  const handleConnectWithOAuth = async (platformId: string, platformName: string, fallbackUrl: string) => {
     setConnectingApp(platformId);
-    // Open Composio OAuth authorization page directly
-    window.open(oauthUrl, '_blank', 'noopener,noreferrer');
+    try {
+      const freshUrl = await getFreshComposioAuthUrl(platformId);
+      window.open(freshUrl, '_blank', 'noopener,noreferrer');
+    } catch {
+      window.open(fallbackUrl, '_blank', 'noopener,noreferrer');
+    }
     setTimeout(() => {
       setConnectedMap((prev) => ({ ...prev, [platformId]: true }));
       setConnectingApp(null);
