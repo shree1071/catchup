@@ -1,21 +1,32 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, lazy, Suspense } from 'react';
 import { defaultSiteConfig, type SiteConfig, type CommandItem } from './config/siteConfig';
 import { Navbar } from './components/Navbar';
 import { Hero } from './components/Hero';
-import { AppWindowMockup } from './components/AppWindowMockup';
-import { FeatureGrid } from './components/FeatureGrid';
-import { ExtensionsGrid } from './components/ExtensionsGrid';
-import { QuickStartTerminal } from './components/QuickStartTerminal';
-import { CommandPaletteModal } from './components/CommandPaletteModal';
-import { CustomizeDrawer } from './components/CustomizeDrawer';
-import { ChatbotView } from './components/ChatbotView';
-import { ConnectedWorkspaceView } from './components/ConnectedWorkspaceView';
-import { ZapierMcpModal } from './components/ZapierMcpModal';
-import { TeamsCatchUpModal } from './components/TeamsCatchUpModal';
-import { ComposioConnectSection } from './components/ComposioConnectSection';
-import { TriageComparisonSection } from './components/TriageComparisonSection';
-import { Footer } from './components/Footer';
+import { ErrorBoundary } from './components/ErrorBoundary';
 import { Check } from 'lucide-react';
+import { Footer } from './components/Footer';
+
+// Lazy-loaded heavy components for code-splitting & reduced initial bundle
+const ChatbotView = lazy(() => import('./components/ChatbotView').then(m => ({ default: m.ChatbotView })));
+const ConnectedWorkspaceView = lazy(() => import('./components/ConnectedWorkspaceView').then(m => ({ default: m.ConnectedWorkspaceView })));
+const CommandPaletteModal = lazy(() => import('./components/CommandPaletteModal').then(m => ({ default: m.CommandPaletteModal })));
+const ZapierMcpModal = lazy(() => import('./components/ZapierMcpModal').then(m => ({ default: m.ZapierMcpModal })));
+const TeamsCatchUpModal = lazy(() => import('./components/TeamsCatchUpModal').then(m => ({ default: m.TeamsCatchUpModal })));
+const CustomizeDrawer = lazy(() => import('./components/CustomizeDrawer').then(m => ({ default: m.CustomizeDrawer })));
+const AppWindowMockup = lazy(() => import('./components/AppWindowMockup').then(m => ({ default: m.AppWindowMockup })));
+const FeatureGrid = lazy(() => import('./components/FeatureGrid').then(m => ({ default: m.FeatureGrid })));
+const ExtensionsGrid = lazy(() => import('./components/ExtensionsGrid').then(m => ({ default: m.ExtensionsGrid })));
+const QuickStartTerminal = lazy(() => import('./components/QuickStartTerminal').then(m => ({ default: m.QuickStartTerminal })));
+const ComposioConnectSection = lazy(() => import('./components/ComposioConnectSection').then(m => ({ default: m.ComposioConnectSection })));
+const TriageComparisonSection = lazy(() => import('./components/TriageComparisonSection').then(m => ({ default: m.TriageComparisonSection })));
+
+function LoadingFallback() {
+  return (
+    <div className="flex items-center justify-center min-h-[200px]">
+      <div className="w-5 h-5 border-2 border-[#ff6363]/30 border-t-[#ff6363] rounded-full animate-spin" />
+    </div>
+  );
+}
 
 export function App() {
   const [config, setConfig] = useState<SiteConfig>(defaultSiteConfig);
@@ -118,7 +129,9 @@ export function App() {
       )}
 
       {/* Main View: Landing vs Connect Hub vs AI Chatbot */}
-      <main className={`flex flex-col items-center w-full ${activeView === 'landing' ? 'pt-0' : activeView === 'chat' ? 'pt-0 h-screen overflow-hidden' : 'pt-20'}`}>
+      <ErrorBoundary fallbackTitle="View failed to load">
+        <Suspense fallback={<LoadingFallback />}>
+          <main className={`flex flex-col items-center w-full ${activeView === 'landing' ? 'pt-0' : activeView === 'chat' ? 'pt-0 h-screen overflow-hidden' : 'pt-20'}`}>
         {activeView === 'landing' ? (
           <>
             {/* Hero Section with Red/Blue Gradient Geometry & 56px Inter regular title */}
@@ -185,7 +198,9 @@ export function App() {
             onOpenZapierModal={() => setIsZapierModalOpen(true)}
           />
         )}
-      </main>
+          </main>
+        </Suspense>
+      </ErrorBoundary>
 
       {/* Footer (Hidden in chat view for native full-height chat app) */}
       {activeView !== 'chat' && (
@@ -197,41 +212,43 @@ export function App() {
         />
       )}
 
-      {/* Global Command Palette Overlay Modal (⌘K) */}
-      <CommandPaletteModal
-        isOpen={isCommandPaletteOpen}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        commands={config.commands}
-        onExecuteCommand={handleExecuteCommand}
-      />
+      <Suspense fallback={null}>
+        {/* Global Command Palette Overlay Modal (⌘K) */}
+        <CommandPaletteModal
+          isOpen={isCommandPaletteOpen}
+          onClose={() => setIsCommandPaletteOpen(false)}
+          commands={config.commands}
+          onExecuteCommand={handleExecuteCommand}
+        />
 
-      {/* Zapier MCP & Agent Skills Modal (Teams, Notion, Slack) */}
-      <ZapierMcpModal
-        isOpen={isZapierModalOpen}
-        onClose={() => setIsZapierModalOpen(false)}
-        onNotify={(msg) => {
-          setActiveToast(msg);
-          setTimeout(() => setActiveToast(null), 3000);
-        }}
-      />
+        {/* Zapier MCP & Agent Skills Modal (Teams, Notion, Slack) */}
+        <ZapierMcpModal
+          isOpen={isZapierModalOpen}
+          onClose={() => setIsZapierModalOpen(false)}
+          onNotify={(msg) => {
+            setActiveToast(msg);
+            setTimeout(() => setActiveToast(null), 3000);
+          }}
+        />
 
-      {/* Teams CatchUp "What Did I Miss?" AI Summarizer (Groq LPU + Local-First) */}
-      <TeamsCatchUpModal
-        isOpen={isTeamsCatchUpOpen}
-        onClose={() => setIsTeamsCatchUpOpen(false)}
-        onNotify={(msg) => {
-          setActiveToast(msg);
-          setTimeout(() => setActiveToast(null), 3000);
-        }}
-      />
+        {/* Teams CatchUp "What Did I Miss?" AI Summarizer (Groq LPU + Local-First) */}
+        <TeamsCatchUpModal
+          isOpen={isTeamsCatchUpOpen}
+          onClose={() => setIsTeamsCatchUpOpen(false)}
+          onNotify={(msg) => {
+            setActiveToast(msg);
+            setTimeout(() => setActiveToast(null), 3000);
+          }}
+        />
 
-      {/* Hackathon PS Customizer Drawer */}
-      <CustomizeDrawer
-        isOpen={isCustomizerOpen}
-        onClose={() => setIsCustomizerOpen(false)}
-        config={config}
-        onUpdateConfig={handleUpdateConfig}
-      />
+        {/* Hackathon PS Customizer Drawer */}
+        <CustomizeDrawer
+          isOpen={isCustomizerOpen}
+          onClose={() => setIsCustomizerOpen(false)}
+          config={config}
+          onUpdateConfig={handleUpdateConfig}
+        />
+      </Suspense>
     </div>
   );
 }
