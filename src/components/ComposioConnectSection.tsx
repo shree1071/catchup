@@ -144,11 +144,13 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
     google: false,
   });
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [filterCategory, setFilterCategory] = useState<'all' | 'chat' | 'wiki' | 'dev'>('all');
 
   const platforms = [
     {
       id: 'teams',
       name: 'Microsoft Teams',
+      category: 'chat' as const,
       logo: PlatformIcons.Teams,
       oauthUrl: 'https://connect.composio.dev/link/lk_pQFDirDB0_mA',
       unreadBadge: connectedMap['teams'] ? '38 unread' : 'OAuth Required',
@@ -160,6 +162,7 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
     {
       id: 'slack',
       name: 'Slack',
+      category: 'chat' as const,
       logo: PlatformIcons.Slack,
       oauthUrl: 'https://connect.composio.dev/link/lk_u8c23cBc0A4e',
       unreadBadge: connectedMap['slack'] ? '19 unread' : 'OAuth Required',
@@ -171,6 +174,7 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
     {
       id: 'notion',
       name: 'Notion Workspace',
+      category: 'wiki' as const,
       logo: PlatformIcons.Notion,
       oauthUrl: 'https://connect.composio.dev/link/lk_f0pnCtTxFs7s',
       unreadBadge: connectedMap['notion'] ? 'Live Sync' : 'OAuth Required',
@@ -182,6 +186,7 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
     {
       id: 'github',
       name: 'GitHub',
+      category: 'dev' as const,
       logo: PlatformIcons.GitHub,
       oauthUrl: 'https://connect.composio.dev/link/lk_github_connect',
       unreadBadge: connectedMap['github'] ? 'CI Blocker' : 'OAuth Required',
@@ -193,6 +198,7 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
     {
       id: 'discord',
       name: 'Discord Communities',
+      category: 'chat' as const,
       logo: PlatformIcons.Discord,
       oauthUrl: 'https://connect.composio.dev/link/lk_discord_connect',
       unreadBadge: connectedMap['discord'] ? 'Active' : 'OAuth Required',
@@ -204,6 +210,7 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
     {
       id: 'google',
       name: 'Google Workspace',
+      category: 'dev' as const,
       logo: PlatformIcons.Google,
       oauthUrl: 'https://connect.composio.dev/link/lk_google_connect',
       unreadBadge: connectedMap['google'] ? 'Active' : 'OAuth Required',
@@ -213,6 +220,10 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
       color: '#4285F4',
     },
   ];
+
+  const filteredPlatforms = platforms.filter(
+    (p) => filterCategory === 'all' || p.category === filterCategory
+  );
 
   const handleConnectWithOAuth = (platformId: string, platformName: string, oauthUrl: string) => {
     setConnectingApp(platformId);
@@ -310,9 +321,40 @@ export const ComposioConnectSection: React.FC<ComposioConnectSectionProps> = ({
         </div>
       </div>
 
+      {/* Category Filter Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-6 gap-3">
+        <div className="flex items-center gap-2">
+          <span className="text-[14px] font-semibold text-[#ffffff]">Platform Toolkits</span>
+          <span className="text-[11px] font-['GeistMono'] text-[#9c9c9d] bg-[#111214] px-2 py-0.5 rounded-full border border-[#27282b]">
+            {filteredPlatforms.length} Available
+          </span>
+        </div>
+
+        <div className="flex items-center gap-1 p-1 rounded-[8px] bg-[#0c0d10] border border-[#27282b] text-[12px] overflow-x-auto">
+          {[
+            { id: 'all', label: 'All Tools' },
+            { id: 'chat', label: 'Chat & War Rooms' },
+            { id: 'wiki', label: 'Wikis & Specs' },
+            { id: 'dev', label: 'Developer & Cloud' },
+          ].map((cat) => (
+            <button
+              key={cat.id}
+              onClick={() => setFilterCategory(cat.id as any)}
+              className={`px-3 py-1 rounded-[6px] transition-all cursor-pointer whitespace-nowrap ${
+                filterCategory === cat.id
+                  ? 'bg-[#1b1c1e] text-[#ffffff] border border-[#363739] shadow-sm'
+                  : 'text-[#9c9c9d] hover:text-[#ffffff]'
+              }`}
+            >
+              {cat.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
       {/* Grid of Composio-Connected Platforms */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-        {platforms.map((p) => {
+        {filteredPlatforms.map((p) => {
           const Logo = p.logo;
           const isBusy = connectingApp === p.id;
 

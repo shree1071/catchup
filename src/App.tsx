@@ -13,6 +13,7 @@ import { ConnectedWorkspaceView } from './components/ConnectedWorkspaceView';
 import { ZapierMcpModal } from './components/ZapierMcpModal';
 import { TeamsCatchUpModal } from './components/TeamsCatchUpModal';
 import { ComposioConnectSection } from './components/ComposioConnectSection';
+import { TriageComparisonSection } from './components/TriageComparisonSection';
 import { Footer } from './components/Footer';
 import { Check } from 'lucide-react';
 
@@ -130,6 +131,12 @@ export function App() {
               onOpenCustomizer={() => setIsCustomizerOpen(true)}
               onOpenCatchUp={() => setIsTeamsCatchUpOpen(true)}
               onOpenConnectWorkspace={() => setActiveView('connect')}
+            />
+
+            {/* Interactive "The Unread Chaos vs CatchUp AI Clarity" Live Triage Comparison */}
+            <TriageComparisonSection
+              onOpenCatchUpModal={() => setIsTeamsCatchUpOpen(true)}
+              onOpenZapierModal={() => setIsZapierModalOpen(true)}
             />
 
             {/* Composio Platform Integrations Section (Teams, Slack, Notion, GitHub, Discord) */}

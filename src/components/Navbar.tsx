@@ -72,20 +72,26 @@ export const Navbar: React.FC<NavbarProps> = ({
 
         {/* Center: Clean & Minimal Nav Links */}
         <div className="hidden md:flex items-center gap-6">
-          <button
-            onClick={() => onNavigateView('connect')}
-            className={`font-['Inter'] text-[13px] font-medium transition-colors duration-150 cursor-pointer flex items-center gap-1.5 ${
-              _activeView === 'connect' ? 'text-[#ff6363]' : 'text-[#ffffff] hover:text-[#ff6363]'
-            }`}
+          <a
+            href="#triage-demo"
+            className="font-['Inter'] text-[13px] font-medium text-[#9c9c9d] hover:text-[#ffffff] transition-colors duration-150 flex items-center gap-1.5"
           >
-            <span>Connect Apps</span>
-          </button>
+            <span>Live Triage</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-[#ff6363]" />
+          </a>
 
           <a
-            href="#command-center"
+            href="#composio-connect"
             className="font-['Inter'] text-[13px] font-medium text-[#9c9c9d] hover:text-[#ffffff] transition-colors duration-150"
           >
-            Features
+            Composio Hub
+          </a>
+
+          <a
+            href="#features"
+            className="font-['Inter'] text-[13px] font-medium text-[#9c9c9d] hover:text-[#ffffff] transition-colors duration-150"
+          >
+            Architecture
           </a>
 
           <button

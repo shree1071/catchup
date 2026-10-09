@@ -30,10 +30,10 @@ export const FeatureGrid: React.FC<FeatureGridProps> = ({ features }) => {
         {features.map((feature) => (
           <div
             key={feature.id}
-            className="group relative rounded-[16px] bg-[#07080a] p-6 transition-all duration-300 hover:-translate-y-1"
+            className="group relative rounded-[16px] bg-[#07080a] p-6 transition-all duration-300 hover:-translate-y-1.5 border border-[#27282b] hover:border-[#ff6363]/50 hover:shadow-[0_8px_30px_rgba(255,99,99,0.08)]"
             style={{
               boxShadow:
-                'rgba(255, 255, 255, 0.05) 0px 1px 0px 0px inset, rgba(255, 255, 255, 0.22) 0px 0px 0px 1px, rgba(0, 0, 0, 0.2) 0px -1px 0px 0px inset',
+                'rgba(255, 255, 255, 0.05) 0px 1px 0px 0px inset, rgba(255, 255, 255, 0.08) 0px 0px 0px 1px, rgba(0, 0, 0, 0.4) 0px 8px 24px 0px',
             }}
           >
             {/* Top row: Circular 99999px icon backing + optional badge */}

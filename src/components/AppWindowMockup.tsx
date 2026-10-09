@@ -119,84 +119,169 @@ export const AppWindowMockup: React.FC<AppWindowMockupProps> = ({
           </div>
         </div>
 
-        {/* Command Result List */}
-        <div className="p-2 sm:p-3 max-h-[360px] overflow-y-auto space-y-1">
-          {filteredCommands.length === 0 ? (
-            <div className="py-12 text-center text-[#6a6b6c] font-['Inter'] text-[14px]">
-              No matching commands found for "{searchTerm}".
-            </div>
-          ) : (
-            filteredCommands.map((item, idx) => {
-              const isSelected = idx === selectedIndex;
-              return (
-                <div
-                  key={item.id}
-                  onClick={() => handleSelect(idx, item)}
-                  className={`group flex items-center justify-between px-3 py-2.5 rounded-[8px] cursor-pointer transition-all duration-150 ${
-                    isSelected
-                      ? 'bg-[#111214] border-l-2 border-[#ff6363] text-[#ffffff]'
-                      : 'hover:bg-[#111214]/60 text-[#9c9c9d] border-l-2 border-transparent'
-                  }`}
-                  style={{
-                    backgroundColor: isSelected ? '#111214' : 'transparent',
-                  }}
-                >
-                  {/* Left: Icon + Title + Subtitle */}
-                  <div className="flex items-center gap-3 min-w-0 pr-2">
-                    <div
-                      className={`w-8 h-8 rounded-[99999px] flex items-center justify-center shrink-0 transition-colors ${
-                        isSelected
-                          ? 'bg-[#ff6363]/15 text-[#ff6363] border border-[#ff6363]/40'
-                          : 'bg-[#1b1c1e] text-[#e6e6e6] border border-[#2f3031]'
-                      }`}
-                    >
-                      <IconHelper name={item.icon} className="w-4 h-4" />
+        {/* Command Result List & Raycast Inspector Split View */}
+        <div className="grid grid-cols-1 md:grid-cols-12 min-h-[380px]">
+          {/* Left Column: Command Items */}
+          <div className="md:col-span-7 p-2 sm:p-3 max-h-[380px] overflow-y-auto space-y-1 border-b md:border-b-0 md:border-r border-[#1b1c1e]">
+            {filteredCommands.length === 0 ? (
+              <div className="py-12 text-center text-[#6a6b6c] font-['Inter'] text-[14px]">
+                No matching commands found for "{searchTerm}".
+              </div>
+            ) : (
+              filteredCommands.map((item, idx) => {
+                const isSelected = idx === selectedIndex;
+                return (
+                  <div
+                    key={item.id}
+                    onClick={() => handleSelect(idx, item)}
+                    className={`group flex items-center justify-between px-3 py-2.5 rounded-[8px] cursor-pointer transition-all duration-150 ${
+                      isSelected
+                        ? 'bg-[#111214] border-l-2 border-[#ff6363] text-[#ffffff]'
+                        : 'hover:bg-[#111214]/60 text-[#9c9c9d] border-l-2 border-transparent'
+                    }`}
+                    style={{
+                      backgroundColor: isSelected ? '#111214' : 'transparent',
+                    }}
+                  >
+                    {/* Left: Icon + Title + Subtitle */}
+                    <div className="flex items-center gap-3 min-w-0 pr-2">
+                      <div
+                        className={`w-8 h-8 rounded-[99999px] flex items-center justify-center shrink-0 transition-colors ${
+                          isSelected
+                            ? 'bg-[#ff6363]/15 text-[#ff6363] border border-[#ff6363]/40'
+                            : 'bg-[#1b1c1e] text-[#e6e6e6] border border-[#2f3031]'
+                        }`}
+                      >
+                        <IconHelper name={item.icon} className="w-4 h-4" />
+                      </div>
+
+                      <div className="flex flex-col min-w-0 text-left">
+                        <div className="flex items-center gap-2">
+                          <span
+                            className={`font-['Inter'] text-[14px] font-medium truncate ${
+                              isSelected ? 'text-[#ffffff]' : 'text-[#ffffff]/90'
+                            }`}
+                          >
+                            {item.title}
+                          </span>
+                          {item.category === 'AI Tools' && (
+                            <span className="bg-[#ff6363]/10 text-[#ff6363] text-[10px] font-mono px-1.5 py-0.2 rounded border border-[#ff6363]/20 font-medium">
+                              AI
+                            </span>
+                          )}
+                        </div>
+                        <span className="font-['Inter'] text-[12px] text-[#6a6b6c] truncate">
+                          {item.subtitle}
+                        </span>
+                      </div>
                     </div>
 
-                    <div className="flex flex-col min-w-0 text-left">
-                      <div className="flex items-center gap-2">
-                        <span
-                          className={`font-['Inter'] text-[14px] font-medium truncate ${
-                            isSelected ? 'text-[#ffffff]' : 'text-[#ffffff]/90'
-                          }`}
-                        >
-                          {item.title}
-                        </span>
-                        {item.category === 'AI Tools' && (
-                          <span className="bg-[#ff6363]/10 text-[#ff6363] text-[10px] font-mono px-1.5 py-0.2 rounded border border-[#ff6363]/20 font-medium">
-                            AI
-                          </span>
-                        )}
+                    {/* Right: Shortcut Key / Action Trigger */}
+                    <div className="flex items-center gap-2 shrink-0">
+                      {item.shortcut && (
+                        <kbd className="hidden sm:inline-block font-['GeistMono'] text-[11px] text-[#6a6b6c] bg-[#1b1c1e] px-1.5 py-0.5 rounded border border-[#2f3031]">
+                          {item.shortcut}
+                        </kbd>
+                      )}
+
+                      <div
+                        className={`flex items-center gap-1 font-['Inter'] text-[12px] px-2 py-1 rounded-[6px] transition-colors ${
+                          isSelected
+                            ? 'bg-[#e6e6e6] text-[#454647] font-medium'
+                            : 'opacity-0 group-hover:opacity-100 text-[#9c9c9d] bg-[#1b1c1e]'
+                        }`}
+                      >
+                        <span>{item.actionText || 'Run'}</span>
+                        <CornerDownLeft className="w-3 h-3" />
                       </div>
-                      <span className="font-['Inter'] text-[12px] text-[#6a6b6c] truncate">
-                        {item.subtitle}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+          </div>
+
+          {/* Right Column: Raycast Live Inspector Pane */}
+          {(() => {
+            const selectedItem = filteredCommands[selectedIndex] || filteredCommands[0];
+            if (!selectedItem) return null;
+
+            return (
+              <div className="hidden md:flex md:col-span-5 p-5 bg-[#08090b] flex-col justify-between">
+                <div>
+                  <div className="flex items-center justify-between mb-4 pb-3 border-b border-[#1b1c1e]">
+                    <span className="text-[11px] font-['GeistMono'] text-[#9c9c9d] uppercase tracking-wider">
+                      Command Inspector
+                    </span>
+                    <span className="text-[10px] font-['GeistMono'] text-[#ff6363] bg-[#ff6363]/10 px-1.5 py-0.5 rounded border border-[#ff6363]/20">
+                      {selectedItem.category}
+                    </span>
+                  </div>
+
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-10 h-10 rounded-[10px] bg-[#111214] border border-[#2f3031] flex items-center justify-center text-[#ff6363] shrink-0">
+                      <IconHelper name={selectedItem.icon} className="w-5 h-5" />
+                    </div>
+                    <div className="text-left">
+                      <h4 className="font-['Inter'] font-semibold text-[14px] text-[#ffffff] leading-tight line-clamp-1">
+                        {selectedItem.title}
+                      </h4>
+                      <span className="font-['GeistMono'] text-[11px] text-[#6a6b6c]">
+                        Shortcut: {selectedItem.shortcut || '↵ Enter'}
                       </span>
                     </div>
                   </div>
 
-                  {/* Right: Shortcut Key / Action Trigger */}
-                  <div className="flex items-center gap-2 shrink-0">
-                    {item.shortcut && (
-                      <kbd className="hidden sm:inline-block font-['GeistMono'] text-[11px] text-[#6a6b6c] bg-[#1b1c1e] px-1.5 py-0.5 rounded border border-[#2f3031]">
-                        {item.shortcut}
-                      </kbd>
-                    )}
+                  {/* Live Output Simulation Card */}
+                  <div className="p-3 rounded-[10px] bg-[#111214] border border-[#27282b] mb-4 text-left">
+                    <div className="flex items-center gap-1.5 text-[10px] font-['GeistMono'] text-[#59d499] mb-1.5">
+                      <Sparkles className="w-3 h-3 text-[#59d499]" />
+                      <span>Live Output Preview</span>
+                    </div>
+                    <p className="text-[12px] text-[#cccccc] leading-relaxed">
+                      {selectedItem.id === 'cmd-teams-catchup'
+                        ? 'Production auth latency normalized to 45ms following rollback of PR #182. Sarah requested PR #402 review.'
+                        : selectedItem.id === 'cmd-teams-product'
+                        ? 'Demo prep: Slides finalized with Raycast dark theme. Groq LPU API tier verified. Backup video due 2:00 PM.'
+                        : selectedItem.id === 'cmd-teams-mentions'
+                        ? 'Urgent mention from @Sarah: "Need your urgent PR review on #402 before 4:00 PM today so we can tag v2.4.1 release."'
+                        : selectedItem.id === 'cmd-toggle-privacy'
+                        ? 'Client-side WebAssembly parser active. Heuristic entity isolation enforced. Zero cloud telemetry sent.'
+                        : selectedItem.id === 'cmd-notion-sync'
+                        ? 'Zapier MCP connected: Auto-exports verified action checklist directly into project specification database.'
+                        : 'Executes command and synchronizes conversation state with local intelligence index.'}
+                    </p>
+                  </div>
 
-                    <div
-                      className={`flex items-center gap-1 font-['Inter'] text-[12px] px-2 py-1 rounded-[6px] transition-colors ${
-                        isSelected
-                          ? 'bg-[#e6e6e6] text-[#454647] font-medium'
-                          : 'opacity-0 group-hover:opacity-100 text-[#9c9c9d] bg-[#1b1c1e]'
-                      }`}
-                    >
-                      <span>{item.actionText || 'Run'}</span>
-                      <CornerDownLeft className="w-3 h-3" />
+                  {/* Execution Specs */}
+                  <div className="space-y-1.5 text-[11px] font-['GeistMono'] text-[#9c9c9d] text-left">
+                    <div className="flex justify-between py-1 border-b border-[#141518]">
+                      <span>Execution Engine</span>
+                      <span className="text-[#ffffff]">Groq LPU / Local WASM</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-[#141518]">
+                      <span>Synthesis Speed</span>
+                      <span className="text-[#59d499]">&lt;1.2s (312 tok/s)</span>
+                    </div>
+                    <div className="flex justify-between py-1 border-b border-[#141518]">
+                      <span>Data Retention</span>
+                      <span className="text-[#59d499]">0 bytes stored</span>
                     </div>
                   </div>
                 </div>
-              );
-            })
-          )}
+
+                <div className="pt-4 border-t border-[#1b1c1e]">
+                  <button
+                    onClick={() => handleSelect(selectedIndex, selectedItem)}
+                    className="w-full py-2 px-3 rounded-[8px] bg-[#ff6363] hover:bg-[#ff7a7a] text-[#040506] font-semibold text-[12px] transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-[0_2px_12px_rgba(255,99,99,0.3)] active:scale-95"
+                  >
+                    <span>Execute {selectedItem.actionText || 'Command'}</span>
+                    <CornerDownLeft className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Bottom Window Footer Strip: Navigation hints */}
