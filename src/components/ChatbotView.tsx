@@ -13,6 +13,8 @@ import {
   Brain,
   MessageSquare,
   FileText,
+  RefreshCw,
+  PlusCircle,
 } from 'lucide-react';
 import {
   sendGroqChat,
@@ -22,6 +24,14 @@ import {
 import {
   executeZapierMcpAction,
 } from '../services/zapierMcpService';
+import {
+  fetchLiveChannels,
+  fetchLiveMessages,
+  buildRealWorkspacePromptContext,
+  sendLiveSlackMessage,
+  type LiveMessage,
+  type SlackChannel,
+} from '../services/workspaceConnectorService';
 
 interface ChatbotViewProps {
   onBackToLanding?: () => void;
@@ -35,32 +45,6 @@ interface ZapierMessageStatus {
   durationMs: number;
 }
 
-const WORKSPACE_MESSAGES_CONTEXT = `
-[LIVE CONNECTED WORKSPACE MESSAGES & CONVERSATIONS]
-
-1. Slack Workspace - #war-room (Auth Latency Spike Incident):
-- 10:14 AM - @dev_sarah: Alert: Auth service latency spiked to 3.2s. 504 errors on /api/login for ~12% of traffic.
-- 10:16 AM - @alex_lead: Checking Grafana. Redis connection pool is at 100% capacity on worker-node-04.
-- 10:19 AM - @dev_sarah: Root cause found: PR #182 left connection keep-alive open without timeout.
-- 10:22 AM - @alex_lead: @dev_sarah rollback PR #182 immediately. I will scale up Redis replicas on node-04 now.
-- 10:28 AM - @dev_sarah: PR #182 reverted and deployed. Latency returned to 45ms. Incident resolved.
-- 10:30 AM - @marcus_pm: Need a quick post-mortem doc ready before tomorrow's executive review.
-
-2. Microsoft Teams - Product & Engineering Sync:
-- 10:35 AM - @marcus_pm: Heads up team: Client demo for Q4 AI Search is moved to tomorrow 3:00 PM EST.
-- 10:37 AM - @priya_design: Figma components for the workspace connection cards are finalized and ready in #design-specs.
-- 10:41 AM - @marcus_pm: @alex_lead please ensure staging environment has mock data seeded by 11:00 AM.
-- 10:44 AM - @alex_lead: On it. Seeding script is executing now, will confirm when staging is hot.
-
-3. Notion Workspace - Sprint 44 Incident Log & Backlog:
-- Incident Post-Mortem #402: Resolved | Severity: P0 | Impact: 12% login drop for 14 minutes.
-- Action Items:
-  1. Audit all Redis connection pooling configurations across services (Owner: @alex_lead, Due: Friday).
-  2. Implement automated keep-alive timeout linting rule in CI/CD pipeline (Owner: @dev_sarah, Due: Monday).
-  3. Update on-call runbook with Redis failover playbook (Owner: @dev_sarah).
-- Decision: Groq LPU standardized for sub-second AI summarization across client apps.
-`;
-
 export const ChatbotView: React.FC<ChatbotViewProps> = ({
   onBackToLanding,
   onOpenZapierModal,
@@ -70,13 +54,13 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({
       id: 'init-1',
       role: 'assistant',
       content:
-        'Welcome to CatchUp AI Copilot! Connected to Groq LPU (sub-second inference) with live read access to your Slack (#war-room), Microsoft Teams, and Notion feeds. Ask me what you missed, who fixed the auth outage, or what action items are open!',
+        'Welcome to CatchUp AI Copilot! Connected to Groq LPU (sub-second inference) with live read access to your authenticated inmodel Slack workspace (#all-inmodel, #inmodel-sales-deals, #new-channel, #social). Ask me what messages have been posted, who is active, or to summarize your channel activity!',
       timestamp: Date.now(),
       metrics: {
         latencyMs: 120,
         tokensPerSecond: 950,
-        completionTokens: 38,
-        totalTokens: 38,
+        completionTokens: 42,
+        totalTokens: 42,
       },
     },
   ]);
@@ -89,8 +73,38 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({
   const [apiKeyOverride, setApiKeyOverride] = useState('');
   const [expandedReasoning, setExpandedReasoning] = useState<Record<string, boolean>>({});
   const [zapierStatus, setZapierStatus] = useState<Record<string, ZapierMessageStatus>>({});
+
+  // Real Workspace Connector State
+  const [liveChannels, setLiveChannels] = useState<SlackChannel[]>([]);
+  const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
+  const [isSyncingLive, setIsSyncingLive] = useState(false);
+  const [showSlackPostBox, setShowSlackPostBox] = useState(false);
+  const [quickPostText, setQuickPostText] = useState('');
+  const [isPostingSlack, setIsPostingSlack] = useState(false);
+  const [postFeedback, setPostFeedback] = useState<string | null>(null);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
+
+  const syncLiveWorkspace = async () => {
+    setIsSyncingLive(true);
+    try {
+      const [channels, msgs] = await Promise.all([
+        fetchLiveChannels(),
+        fetchLiveMessages('C0BBUP1LEJH'),
+      ]);
+      setLiveChannels(channels);
+      setLiveMessages(msgs);
+    } catch (err) {
+      console.error('Error syncing live workspace:', err);
+    } finally {
+      setIsSyncingLive(false);
+    }
+  };
+
+  useEffect(() => {
+    syncLiveWorkspace();
+  }, []);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -101,11 +115,34 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({
   }, [messages, isLoading, zapierStatus]);
 
   const quickPrompts = [
-    'What happened in the Slack #war-room outage?',
-    'What are the action items assigned to Sarah and Alex?',
-    'What did Marcus and Priya discuss on Microsoft Teams?',
-    'Give me an executive 3-bullet summary of all unread messages',
+    'What was the latest message in #all-inmodel?',
+    'Summarize all active channels in the inmodel workspace',
+    'What did @shreeharshastark post to the channel?',
+    'Draft a project status update to post to #all-inmodel',
   ];
+
+  const handlePostToSlack = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!quickPostText.trim() || isPostingSlack) return;
+
+    setIsPostingSlack(true);
+    setPostFeedback(null);
+    try {
+      const ok = await sendLiveSlackMessage(quickPostText.trim(), 'C0BBUP1LEJH');
+      if (ok) {
+        setPostFeedback('✓ Message posted to Slack #all-inmodel!');
+        setQuickPostText('');
+        await syncLiveWorkspace();
+        setTimeout(() => setPostFeedback(null), 3000);
+      } else {
+        setPostFeedback('⚠️ Failed to post message to Slack');
+      }
+    } catch {
+      setPostFeedback('⚠️ Error sending message');
+    } finally {
+      setIsPostingSlack(false);
+    }
+  };
 
   const handleDispatchToTeams = async (messageId: string, content: string) => {
     setZapierStatus((prev) => ({
@@ -214,18 +251,20 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({
         content: m.content,
       }));
 
+      const workspaceContext = buildRealWorkspacePromptContext(liveMessages, liveChannels);
+
       const result = await sendGroqChat({
         messages: history,
         model: selectedModel,
         apiKey: apiKeyOverride,
         systemPrompt: `You are CatchUp AI Copilot powered by Groq LPUs.
-You have direct real-time read access to the user's connected workspace feeds (Slack, Microsoft Teams, and Notion):
-${WORKSPACE_MESSAGES_CONTEXT}
+You have direct real-time read access to the user's authentic connected workspace:
+${workspaceContext}
 
 Instructions:
-1. Always reference exact facts, people (@dev_sarah, @alex_lead, @marcus_pm, @priya_design), timestamps, and channels when answering questions.
+1. Reference exact facts, real channels (#all-inmodel, #inmodel-sales-deals, #new-channel, #social), real usernames (@shreeharshastark), and exact message timestamps.
 2. Provide concise, clear, and actionable summaries or answers.
-3. If asked who is on call, who fixed an issue, when a demo is, or what action items exist, give direct, accurate answers based on the messages above.`,
+3. If asked what messages exist, what channel is active, or what was posted, give authentic, accurate answers based on the real messages stream above. Do not invent fake users or mock incidents.`,
       });
 
       const assistantMsgId = `assistant-${Date.now()}`;
@@ -240,7 +279,6 @@ Instructions:
 
       setMessages((prev) => [...prev, assistantMessage]);
 
-      // Auto-trigger Zapier MCP integrations if user prompt requested Teams or Notion
       const lowerPrompt = prompt.toLowerCase();
       if (lowerPrompt.includes('teams')) {
         setTimeout(() => {
@@ -291,7 +329,7 @@ Instructions:
       {
         id: `init-${Date.now()}`,
         role: 'assistant',
-        content: 'Chat session reset. Command bus ready on Groq LPUs.',
+        content: 'Chat session reset. Real-time workspace bus ready on Groq LPUs.',
         timestamp: Date.now(),
       },
     ]);
@@ -324,8 +362,9 @@ Instructions:
               Groq LPU Copilot
             </span>
             <span className="text-[#363739]">/</span>
-            <span className="font-['GeistMono'] text-[12px] text-[#ff6363] bg-[#ff6363]/10 px-2 py-0.5 rounded-[4px] border border-[#ff6363]/20">
-              LIVE API
+            <span className="font-['GeistMono'] text-[12px] text-[#59d499] bg-[#59d499]/10 px-2 py-0.5 rounded-[4px] border border-[#59d499]/20 flex items-center gap-1.5">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#59d499] animate-pulse" />
+              LIVE SLACK FEED
             </span>
           </div>
         </div>
@@ -395,11 +434,11 @@ Instructions:
             </span>
             <span className="font-['GeistMono'] text-[11px] text-[#59d499] flex items-center gap-1">
               <span className="w-2 h-2 rounded-full bg-[#59d499]" />
-              Status: Connected
+              Status: Connected (Groq LPUs)
             </span>
           </div>
           <p className="text-[#9c9c9d] text-[12px] mb-3">
-            Your Groq API key is active. Responses are processed by hardware LPUs in tens of milliseconds.
+            Your Groq API key is active. Real Slack workspace data is streamed directly into prompt context.
           </p>
           <div className="flex items-center gap-2">
             <input
@@ -420,23 +459,75 @@ Instructions:
       )}
 
       {/* Live Workspace Feeds Status Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-[10px] bg-[#0c0d10] border border-[#27282b] mb-3 text-[12px] font-['GeistMono'] animate-fade-in">
-        <div className="flex items-center gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-[10px] bg-[#0c0d10] border border-[#27282b] mb-3 text-[12px] font-['GeistMono'] animate-fade-in">
+        <div className="flex items-center gap-2.5">
           <span className="w-2 h-2 rounded-full bg-[#59d499] animate-pulse" />
-          <span className="text-[#ffffff] font-medium">Groq LPU Active ({selectedModel})</span>
+          <span className="text-[#ffffff] font-medium">
+            Live Connector: <span className="text-[#59d499]">inmodel</span> Slack
+          </span>
+          <span className="text-[#9c9c9d] text-[11px]">
+            ({liveChannels.length || 4} channels • {liveMessages.length} message synced)
+          </span>
         </div>
-        <div className="flex items-center gap-2 text-[11px]">
-          <span className="px-2 py-0.5 rounded bg-[#4A154B]/30 text-[#ECB22E] border border-[#4A154B]/60 font-medium">
-            ● Slack (#war-room) Connected
-          </span>
-          <span className="px-2 py-0.5 rounded bg-[#464EB8]/30 text-[#7B83EB] border border-[#464EB8]/60 font-medium">
-            ● Teams Connected
-          </span>
-          <span className="px-2 py-0.5 rounded bg-[#111214] text-[#ffffff] border border-[#363739] font-medium">
-            ● Notion Synced
-          </span>
+
+        <div className="flex items-center gap-2">
+          <button
+            onClick={syncLiveWorkspace}
+            disabled={isSyncingLive}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#111214] hover:bg-[#1a1b1e] border border-[#2f3031] text-[#9c9c9d] hover:text-[#ffffff] text-[11px] transition-colors cursor-pointer"
+            title="Refresh messages directly from Slack"
+          >
+            <RefreshCw className={`w-3 h-3 ${isSyncingLive ? 'animate-spin text-[#59d499]' : ''}`} />
+            <span>{isSyncingLive ? 'Syncing...' : 'Sync Live'}</span>
+          </button>
+
+          <button
+            onClick={() => setShowSlackPostBox(!showSlackPostBox)}
+            className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#59d499]/15 hover:bg-[#59d499]/25 border border-[#59d499]/40 text-[#59d499] text-[11px] font-medium transition-colors cursor-pointer"
+          >
+            <PlusCircle className="w-3 h-3" />
+            <span>Post to #all-inmodel</span>
+          </button>
         </div>
       </div>
+
+      {/* Quick Post To Slack Flyout */}
+      {showSlackPostBox && (
+        <form
+          onSubmit={handlePostToSlack}
+          className="mb-3 p-3.5 rounded-[10px] bg-[#090b0e] border border-[#59d499]/30 flex flex-col sm:flex-row items-center gap-2 animate-fade-in"
+        >
+          <input
+            type="text"
+            placeholder="Type a real message to post into Slack #all-inmodel..."
+            value={quickPostText}
+            onChange={(e) => setQuickPostText(e.target.value)}
+            className="flex-1 w-full bg-[#111214] border border-[#27282b] focus:border-[#59d499] text-[#ffffff] text-[12px] font-['Inter'] rounded-[6px] px-3 py-1.5 focus:outline-none"
+          />
+          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+            <button
+              type="submit"
+              disabled={!quickPostText.trim() || isPostingSlack}
+              className="px-3 py-1.5 rounded-[6px] bg-[#59d499] hover:bg-[#6ae0a6] text-[#040506] font-semibold text-[12px] transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shrink-0"
+            >
+              <span>{isPostingSlack ? 'Posting...' : 'Send to Slack'}</span>
+              <Send className="w-3 h-3" />
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowSlackPostBox(false)}
+              className="px-2.5 py-1.5 text-[12px] text-[#9c9c9d] hover:text-[#ffffff] cursor-pointer"
+            >
+              Cancel
+            </button>
+          </div>
+          {postFeedback && (
+            <span className="text-[11px] font-['GeistMono'] text-[#59d499] w-full mt-1">
+              {postFeedback}
+            </span>
+          )}
+        </form>
+      )}
 
       {/* Main Messages Feed */}
       <div
@@ -448,55 +539,58 @@ Instructions:
       >
         {messages.map((msg) => {
           const isUser = msg.role === 'user';
+
           return (
             <div
               key={msg.id}
-              className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-full`}
+              className={`flex items-start gap-3 text-[14px] leading-relaxed group relative animate-fade-in ${
+                isUser ? 'justify-end' : 'justify-start'
+              }`}
             >
-              {/* Message Role & Metadata Header */}
-              <div className="flex items-center gap-2 mb-1.5 px-1 text-[11px] font-['GeistMono'] text-[#6a6b6c]">
-                {isUser ? (
-                  <>
-                    <span>You</span>
-                    <User className="w-3 h-3 text-[#9c9c9d]" />
-                  </>
-                ) : (
-                  <>
-                    <div className="w-3.5 h-3.5 rounded-full bg-[#ff6363]/20 text-[#ff6363] flex items-center justify-center">
-                      <Sparkles className="w-2.5 h-2.5" />
-                    </div>
-                    <span className="text-[#9c9c9d]">Groq LPU</span>
-                    <span className="text-[#363739]">•</span>
-                    <span>{selectedModel}</span>
-                    {msg.metrics && (
+              {!isUser && (
+                <div className="w-8 h-8 rounded-[8px] bg-[#111214] border border-[#2f3031] flex items-center justify-center text-[#ff6363] shrink-0 mt-0.5">
+                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current">
+                    <polygon points="12,2 22,12 12,22 2,12" />
+                  </svg>
+                </div>
+              )}
+
+              <div
+                className={`max-w-[85%] rounded-[12px] p-3.5 border transition-all ${
+                  isUser
+                    ? 'bg-[#1b1c1e] border-[#363739] text-[#ffffff]'
+                    : 'bg-[#111214] border-[#27282b] text-[#cccccc]'
+                }`}
+              >
+                {/* Message Header info */}
+                <div className="flex items-center justify-between gap-4 mb-2">
+                  <span className="font-['GeistMono'] text-[11px] text-[#6a6b6c] flex items-center gap-1.5">
+                    {isUser ? (
                       <>
-                        <span className="text-[#363739]">•</span>
-                        <span className="text-[#59d499] flex items-center gap-1 font-semibold">
-                          <Zap className="w-2.5 h-2.5" />
-                          {msg.metrics.latencyMs}ms ({msg.metrics.tokensPerSecond} t/s)
-                        </span>
+                        <User className="w-3 h-3 text-[#9c9c9d]" />
+                        <span>You (shreeharshastark)</span>
+                      </>
+                    ) : (
+                      <>
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#59d499]" />
+                        <span>Groq AI Copilot (inmodel connector)</span>
                       </>
                     )}
-                  </>
-                )}
-              </div>
+                  </span>
 
-              {/* Message Box */}
-              <div
-                className={`relative group max-w-[85%] sm:max-w-[75%] rounded-[12px] p-4 text-[14px] sm:text-[15px] leading-relaxed transition-all ${
-                  isUser
-                    ? 'bg-[#1b1c1e] text-[#ffffff] border border-[#2f3031] rounded-br-[2px]'
-                    : 'bg-[#111214] text-[#e6e6e6] border border-[#2f3031]/90 rounded-bl-[2px]'
-                }`}
-                style={{
-                  boxShadow: isUser
-                    ? 'rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset'
-                    : 'rgba(255, 255, 255, 0.04) 0px 1px 0px 0px inset, rgba(0, 0, 0, 0.2) 0px 4px 12px 0px',
-                }}
-              >
-                {/* Collapsible Reasoning Process if returned by model */}
+                  {msg.metrics && (
+                    <div className="flex items-center gap-2 text-[10px] font-['GeistMono'] text-[#59d499]">
+                      <span>{msg.metrics.latencyMs}ms</span>
+                      {msg.metrics.tokensPerSecond && (
+                        <span>• {Math.round(msg.metrics.tokensPerSecond)} T/s</span>
+                      )}
+                    </div>
+                  )}
+                </div>
+
+                {/* Optional Reasoning Collapse for Reasoning Models */}
                 {msg.reasoning && (
-                  <div className="mb-3 rounded-[8px] bg-[#07080a] border border-[#2f3031]/80 overflow-hidden">
+                  <div className="mb-3 rounded-[8px] border border-[#2f3031] bg-[#07080a] overflow-hidden">
                     <button
                       onClick={() => toggleReasoning(msg.id)}
                       className="w-full flex items-center justify-between px-3 py-1.5 text-left text-[11px] font-['GeistMono'] text-[#9c9c9d] hover:text-[#ffffff] bg-[#07080a] transition-colors cursor-pointer"
@@ -645,7 +739,7 @@ Instructions:
       {/* Quick Prompts Suggestion Pills */}
       <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-2">
         <span className="font-['GeistMono'] text-[11px] text-[#6a6b6c] shrink-0 uppercase">
-          Prompt ideas:
+          Live queries:
         </span>
         {quickPrompts.map((qp, idx) => (
           <button
@@ -668,7 +762,7 @@ Instructions:
         <textarea
           ref={inputRef}
           rows={2}
-          placeholder="Ask Groq anything... (e.g. 'Explain the importance of fast language models') [Press ↵ to send]"
+          placeholder="Ask Groq about your Slack messages... (e.g. 'What was posted in #all-inmodel?') [Press ↵ to send]"
           value={input}
           onChange={(e) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}

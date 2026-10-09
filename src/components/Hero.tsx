@@ -90,46 +90,41 @@ export const Hero: React.FC<HeroProps> = ({
           </button>
         </div>
 
-        {/* Composio Platform Integrations Ribbon */}
-        <div className="mt-10 w-full max-w-[760px] p-3.5 rounded-[12px] bg-[#07080a]/90 border border-[#27282b] backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
-          <div className="flex items-center gap-2.5 text-left">
-            <div className="w-8 h-8 rounded-[8px] bg-[#1b1c1e] border border-[#ff6363]/30 flex items-center justify-center shrink-0">
-              <PlatformIcons.Composio />
-            </div>
-            <div>
-              <div className="font-['Inter'] font-semibold text-[13px] text-[#ffffff] flex items-center gap-1.5">
-                <span>Unified Composio Connections</span>
-                <span className="text-[10px] font-['GeistMono'] text-[#ff6363] bg-[#ff6363]/15 px-1.5 py-0.2 rounded border border-[#ff6363]/30">
-                  Autonomous
-                </span>
-              </div>
-              <div className="font-['Inter'] text-[11px] text-[#9c9c9d]">
-                We link your tools once so you never have to read unread chats yourself.
-              </div>
-            </div>
+        {/* Unified Composio Platform Integrations Strip */}
+        <div className="mt-10 sm:mt-12 w-full max-w-[840px] flex flex-col items-center text-center">
+          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#111214] border border-[#27282b] text-[11px] font-['GeistMono'] text-[#9c9c9d] uppercase tracking-[0.08em] mb-3.5">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#ff6363] animate-pulse" />
+            <span>Connect Once via Composio • Autonomous AI Ingestion</span>
           </div>
 
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-2.5">
             {[
-              { name: 'Microsoft Teams', Icon: PlatformIcons.Teams },
-              { name: 'Slack', Icon: PlatformIcons.Slack },
-              { name: 'Notion', Icon: PlatformIcons.Notion },
-              { name: 'GitHub', Icon: PlatformIcons.GitHub },
-              { name: 'Discord', Icon: PlatformIcons.Discord },
-              { name: 'Google Workspace', Icon: PlatformIcons.Google },
-            ].map(({ name, Icon }) => (
+              { id: 'teams', name: 'Microsoft Teams', Icon: PlatformIcons.Teams },
+              { id: 'slack', name: 'Slack', Icon: PlatformIcons.Slack },
+              { id: 'notion', name: 'Notion', Icon: PlatformIcons.Notion },
+              { id: 'github', name: 'GitHub', Icon: PlatformIcons.GitHub },
+              { id: 'discord', name: 'Discord', Icon: PlatformIcons.Discord },
+              { id: 'google', name: 'Google Workspace', Icon: PlatformIcons.Google },
+            ].map(({ id, name, Icon }) => (
               <button
-                key={name}
+                key={id}
                 onClick={onOpenConnectWorkspace}
-                className="w-8 h-8 rounded-[8px] bg-[#111214] hover:bg-[#1a1b1e] border border-[#2f3031] hover:border-[#ff6363]/50 flex items-center justify-center transition-all cursor-pointer hover:scale-110"
+                className="flex items-center gap-2 px-3 py-1.5 rounded-[8px] bg-[#0c0d10] hover:bg-[#16171d] border border-[#27282b] hover:border-[#ff6363]/40 transition-all cursor-pointer shadow-sm group shrink-0"
                 title={`Connect ${name} via Composio`}
               >
-                <div className="w-4 h-4 flex items-center justify-center">
-                  <Icon />
+                <div className="w-4 h-4 shrink-0 flex items-center justify-center transition-transform group-hover:scale-110">
+                  <Icon className="w-4 h-4" />
                 </div>
+                <span className="font-['Inter'] text-[12px] font-medium text-[#cccccc] group-hover:text-[#ffffff]">
+                  {name}
+                </span>
               </button>
             ))}
           </div>
+
+          <p className="mt-3 text-[12px] font-['Inter'] text-[#6a6b6c]">
+            We connect to your platforms so you don't have to read unread chats yourself.
+          </p>
         </div>
 
         {/* Clean Architecture Spec Pills */}
