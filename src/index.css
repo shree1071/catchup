@@ -1,0 +1,163 @@
+@import "tailwindcss";
+
+@theme {
+  /* Colors */
+  --color-void-black: #040506;
+  --color-ink: #07080a;
+  --color-obsidian: #111214;
+  --color-graphite: #1b1c1e;
+  --color-smoke: #6a6b6c;
+  --color-ash: #9c9c9d;
+  --color-mist: #e6e6e6;
+  --color-iron: #454647;
+  --color-slate: #2f3031;
+  --color-pure-white: #ffffff;
+  --color-coral-pulse: #ff6363;
+  --color-ember-hush: #452324;
+  --color-electric-sky: #63a1ff;
+  --color-cobalt-edge: #143ca3;
+  --color-deep-space: #02193b;
+  --color-info-blue: #56c2ff;
+  --color-success-green: #59d499;
+
+  /* Typography */
+  --font-inter: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-geistmono: 'Geist Mono', 'GeistMono', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  --font-sf-pro-text: 'SF Pro Text', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-sf-pro: 'SF Pro', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+
+  /* Typography — Scale */
+  --text-eyebrow: 11px;
+  --leading-eyebrow: 0.91;
+  --tracking-eyebrow: 0.8px;
+  --text-body: 16px;
+  --leading-body: 1.15;
+  --tracking-body: 0px;
+  --text-body-lg: 18px;
+  --leading-body-lg: 1.15;
+  --tracking-body-lg: 0px;
+  --text-subheading: 20px;
+  --leading-subheading: 1.2;
+  --tracking-subheading: 0.2px;
+  --text-heading-sm: 24px;
+  --leading-heading-sm: 1.15;
+  --tracking-heading-sm: 0px;
+  --text-heading: 32px;
+  --leading-heading: 1.15;
+  --tracking-heading: 0px;
+  --text-heading-lg: 56px;
+  --leading-heading-lg: 1.17;
+  --tracking-heading-lg: 0.22px;
+  --text-display: 64px;
+  --leading-display: 1.1;
+  --tracking-display: 0px;
+
+  /* Spacing */
+  --spacing-8: 8px;
+  --spacing-16: 16px;
+  --spacing-24: 24px;
+  --spacing-32: 32px;
+  --spacing-40: 40px;
+  --spacing-48: 48px;
+  --spacing-56: 56px;
+  --spacing-64: 64px;
+  --spacing-80: 80px;
+  --spacing-96: 96px;
+  --spacing-120: 120px;
+  --spacing-224: 224px;
+
+  /* Border Radius */
+  --radius-cards: 16px;
+  --radius-pills: 9999px;
+  --radius-badges: 6px;
+  --radius-inputs: 8px;
+  --radius-buttons: 8px;
+  --radius-largecards: 20px;
+  --radius-iconcontainers: 99999px;
+}
+
+:root {
+  /* Surfaces */
+  --surface-canvas: #040506;
+  --surface-card: #07080a;
+  --surface-recessed: #111214;
+  --surface-badge: #1b1c1e;
+  --surface-accent-tint: #452324;
+
+  /* Shadows */
+  --shadow-key: rgba(255, 255, 255, 0.05) 0px 1px 0px 0px inset, rgba(255, 255, 255, 0.25) 0px 0px 0px 1px, rgba(0, 0, 0, 0.2) 0px -1px 0px 0px inset;
+  --shadow-key-hover: rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset, rgba(255, 255, 255, 0.35) 0px 0px 0px 1px, rgba(0, 0, 0, 0.25) 0px -1px 0px 0px inset;
+  --shadow-btn-subtle: rgba(0, 0, 0, 0.03) 0px 7px 3px 0px, rgba(0, 0, 0, 0.25) 0px 4px 4px 0px;
+  --shadow-subtle-2: rgb(27, 28, 30) 0px 0px 0px 1px, rgb(7, 8, 10) 0px 0px 0px 1px inset;
+  --shadow-window: rgba(0, 0, 0, 0.6) 0px 24px 64px -12px, rgba(255, 255, 255, 0.08) 0px 0px 0px 1px inset, rgba(0, 0, 0, 0.4) 0px 4px 16px 0px;
+
+  color-scheme: dark;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  background-color: #040506;
+  color: #9c9c9d;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  overflow-x: hidden;
+  selection-background-color: #ff6363;
+  selection-color: #ffffff;
+}
+
+::selection {
+  background: rgba(255, 99, 99, 0.35);
+  color: #ffffff;
+}
+
+/* Custom Tactical Key Shadows */
+.key-shadow {
+  box-shadow: rgba(255, 255, 255, 0.05) 0px 1px 0px 0px inset,
+              rgba(255, 255, 255, 0.22) 0px 0px 0px 1px,
+              rgba(0, 0, 0, 0.25) 0px -1px 0px 0px inset;
+}
+
+.key-shadow:hover {
+  box-shadow: rgba(255, 255, 255, 0.08) 0px 1px 0px 0px inset,
+              rgba(255, 255, 255, 0.35) 0px 0px 0px 1px,
+              rgba(0, 0, 0, 0.3) 0px -1px 0px 0px inset;
+}
+
+.key-shadow-active {
+  box-shadow: rgba(255, 99, 99, 0.25) 0px 1px 0px 0px inset,
+              rgba(255, 99, 99, 0.6) 0px 0px 0px 1px,
+              rgba(0, 0, 0, 0.3) 0px -1px 0px 0px inset;
+}
+
+.btn-mist-shadow {
+  box-shadow: rgba(0, 0, 0, 0.03) 0px 7px 3px 0px, rgba(0, 0, 0, 0.25) 0px 4px 4px 0px;
+}
+
+.hairline-border {
+  border: 1px solid #363739;
+}
+
+.hairline-border-subtle {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #040506;
+}
+::-webkit-scrollbar-thumb {
+  background: #1b1c1e;
+  border-radius: 9999px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #363739;
+}
