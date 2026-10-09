@@ -166,6 +166,7 @@ export function App() {
           /* Dedicated Connected Workspaces (Slack, Notion, Teams) & AI Summarizer Studio */
           <ConnectedWorkspaceView
             onBackToLanding={() => setActiveView('landing')}
+            onNavigateToChat={() => setActiveView('chat')}
             onOpenZapierModal={() => setIsZapierModalOpen(true)}
           />
         ) : (

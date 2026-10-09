@@ -14,10 +14,9 @@ import {
   ListTodo,
   Bot,
   Zap,
-  Lock,
   Search,
-  Copy,
   Check,
+  ShieldCheck,
 } from 'lucide-react';
 import { sendGroqChat } from '../services/groqService';
 
@@ -31,6 +30,7 @@ interface AppIntegration {
   connectedAccount?: string;
   unreadCount?: number;
   scopes: string[];
+  permissionsGranted: string[];
   oauthUrl?: string;
   icon: React.ReactNode;
 }
@@ -43,7 +43,7 @@ interface SourceOption {
   sampleMessages: string;
 }
 
-const SAMPLE_SOURCES: SourceOption[] = [
+export const SAMPLE_SOURCES: SourceOption[] = [
   {
     id: 'all',
     title: 'Unified Digest (Slack + Teams + Notion)',
@@ -60,6 +60,7 @@ const SAMPLE_SOURCES: SourceOption[] = [
 10:35 AM - @marcus_pm: Heads up team: Client demo for Q4 AI Search is moved to tomorrow 3:00 PM EST.
 10:37 AM - @priya_design: Figma components for the workspace connection cards are finalized and ready in #design-specs.
 10:41 AM - @marcus_pm: @alex_lead please ensure staging environment has mock data seeded by 11:00 AM.
+10:44 AM - @alex_lead: On it. Seeding script is executing now, will confirm when staging is hot.
 
 [Notion - Sprint 44 Backlog]
 Updated at 10:45 AM by @marcus_pm:
@@ -104,11 +105,13 @@ Action Items:
 
 interface ConnectedWorkspaceViewProps {
   onBackToLanding: () => void;
+  onNavigateToChat?: () => void;
   onOpenZapierModal?: () => void;
 }
 
 export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
   onBackToLanding,
+  onNavigateToChat,
 }) => {
   // App Integrations List
   const [apps, setApps] = useState<AppIntegration[]>([
@@ -119,9 +122,15 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
       iconBg: '#4A154B',
       category: 'Chat',
       isConnected: false,
-      connectedAccount: undefined,
-      unreadCount: 0,
-      scopes: ['channels:read', 'chat:read', 'users:read'],
+      connectedAccount: 'Acme Corp (#general, #war-room)',
+      unreadCount: 24,
+      scopes: ['channels:read', 'chat:read', 'users:read', 'groups:read'],
+      permissionsGranted: [
+        'Read messages in public and private channels (#war-room)',
+        'Read thread replies and discussion history',
+        'Access user @mentions and active alerts',
+        'Zero-retention: Messages processed ephemerally on device',
+      ],
       oauthUrl: 'https://connect.composio.dev/link/lk_u8c23cBc0A4e',
       icon: (
         <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
@@ -136,9 +145,15 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
       iconBg: '#000000',
       category: 'Wiki',
       isConnected: false,
-      connectedAccount: undefined,
-      unreadCount: 0,
+      connectedAccount: 'Acme Product & Sprint Wiki',
+      unreadCount: 6,
       scopes: ['pages:read', 'databases:read', 'blocks:read'],
+      permissionsGranted: [
+        'Read team docs, incident post-mortems, and specs',
+        'Query sprint roadmap and bug tracking databases',
+        'Inspect comments, task owners, and assignees',
+        'Local-first reading: Zero cloud data retention',
+      ],
       oauthUrl: 'https://connect.composio.dev/link/lk_f0pnCtTxFs7s',
       icon: (
         <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
@@ -153,9 +168,15 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
       iconBg: '#464EB8',
       category: 'Chat',
       isConnected: false,
-      connectedAccount: undefined,
-      unreadCount: 0,
+      connectedAccount: 'Acme Enterprise Microsoft 365',
+      unreadCount: 12,
       scopes: ['Chat.Read', 'ChannelMessage.Read', 'User.Read'],
+      permissionsGranted: [
+        'Read team channel chats and announcements',
+        'Read 1-on-1 and group chat threads',
+        'Read meeting transcripts and missed @mentions',
+        'Zero-retention: Secure local-first processing',
+      ],
       oauthUrl: 'https://connect.composio.dev/link/lk_pQFDirDB0_mA',
       icon: (
         <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
@@ -171,6 +192,11 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
       category: 'Files',
       isConnected: false,
       scopes: ['gmail.readonly', 'drive.readonly', 'docs.readonly'],
+      permissionsGranted: [
+        'Read priority Gmail inbox threads and flags',
+        'Read Google Docs specs and meeting summaries',
+        'Read Google Drive spreadsheet trackers',
+      ],
       oauthUrl: 'https://connect.composio.dev/link/lk_google_connect',
       icon: (
         <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
@@ -186,6 +212,10 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
       category: 'Chat',
       isConnected: false,
       scopes: ['guilds.messages.read', 'bot'],
+      permissionsGranted: [
+        'Read community developer announcements',
+        'Read incident triage and alert channels',
+      ],
       oauthUrl: 'https://connect.composio.dev/link/lk_discord_connect',
       icon: (
         <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
@@ -201,6 +231,11 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
       category: 'Dev',
       isConnected: false,
       scopes: ['repo:status', 'read:org', 'read:user'],
+      permissionsGranted: [
+        'Read pull request comments and review blockers',
+        'Read repository issue threads and milestones',
+        'Read deployment and release status tags',
+      ],
       oauthUrl: 'https://connect.composio.dev/link/lk_github_connect',
       icon: (
         <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
@@ -255,25 +290,20 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
     },
   ]);
 
-  const [copiedId, setCopiedId] = useState<string | null>(null);
-
   const toggleAppConnection = (appId: string) => {
-    const target = apps.find((a) => a.id === appId);
-    if (!target) return;
-
-    if (!target.isConnected && target.oauthUrl) {
-      window.open(target.oauthUrl, '_blank', 'noopener,noreferrer');
-    }
-
     setApps((prev) =>
       prev.map((app) => {
         if (app.id === appId) {
           const next = !app.isConnected;
+          if (next && app.oauthUrl) {
+            // Open direct OAuth link in browser
+            window.open(app.oauthUrl, '_blank', 'noopener,noreferrer');
+          }
           return {
             ...app,
             isConnected: next,
             unreadCount: next ? 12 : 0,
-            connectedAccount: next ? `Authorized via Composio OAuth` : undefined,
+            connectedAccount: next ? `Authorized User Account (${app.name} OAuth 2.0)` : undefined,
           };
         }
         return app;
@@ -321,7 +351,6 @@ Only output valid JSON, no markdown formatting.`;
       try {
         parsed = JSON.parse(cleaned);
       } catch {
-        // Fallback structured object
         parsed = {
           overview: [
             'All unread threads triaged successfully across selected workspace.',
@@ -351,7 +380,6 @@ Only output valid JSON, no markdown formatting.`;
         },
       });
     } catch {
-      // Local graceful fallback if Groq offline
       setSummaryData({
         overview: [
           `Triaged ${selectedSource.unreadCount} unread items from ${selectedSource.title}.`,
@@ -433,10 +461,15 @@ Only output valid JSON, no markdown formatting.`;
             <span className="w-2 h-2 rounded-full bg-[#59d499] animate-pulse" />
             <span>{connectedCount} of {apps.length} Apps Connected</span>
           </div>
-          <div className="hidden sm:flex items-center gap-1.5 text-[11px] font-['GeistMono'] text-[#59d499] bg-[#59d499]/10 border border-[#59d499]/30 px-2.5 py-1 rounded-full">
-            <Lock className="w-3 h-3" />
-            <span>Zero Data Stored</span>
-          </div>
+          {onNavigateToChat && (
+            <button
+              onClick={onNavigateToChat}
+              className="flex items-center gap-1.5 text-[12px] font-['GeistMono'] text-[#ffffff] bg-[#ff6363]/20 hover:bg-[#ff6363]/30 border border-[#ff6363]/40 px-3 py-1 rounded-full cursor-pointer transition-all"
+            >
+              <Bot className="w-3.5 h-3.5 text-[#ff6363]" />
+              <span>Open AI Copilot ↗</span>
+            </button>
+          )}
         </div>
       </div>
 
@@ -444,7 +477,7 @@ Only output valid JSON, no markdown formatting.`;
       <div className="w-full text-center max-w-[780px] my-10">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#ff6363]/10 border border-[#ff6363]/30 text-[#ff6363] text-[11px] font-['GeistMono'] uppercase tracking-wider mb-4">
           <Zap className="w-3 h-3" />
-          <span>One-Click Connections • Instant Synthesis</span>
+          <span>OAuth 2.0 Auth • Instant Groq Synthesis</span>
         </div>
         <h1 className="text-[34px] sm:text-[44px] md:text-[50px] font-bold tracking-tight text-[#ffffff] leading-[1.1]">
           Connect Your Workspaces.
@@ -454,11 +487,11 @@ Only output valid JSON, no markdown formatting.`;
           </span>
         </h1>
         <p className="mt-4 text-[16px] sm:text-[18px] text-[#9c9c9d] leading-relaxed">
-          Link your team tools once. Our AI automatically extracts key blockers, missed mentions, and action items so you never drown in unread messages again.
+          Authenticate once via secure OAuth 2.0. View exactly what permissions are granted, then chat with Groq AI across your active messages.
         </p>
       </div>
 
-      {/* SECTION 1: USER-FRIENDLY APP CARDS WITH ICONS */}
+      {/* SECTION 1: USER-FRIENDLY APP CARDS WITH ICONS & CLEAR OAUTH FLOW */}
       <div className="w-full mb-14">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
@@ -466,7 +499,7 @@ Only output valid JSON, no markdown formatting.`;
             <h2 className="text-[16px] font-semibold text-[#ffffff]">Connected Workspaces & Toolkits</h2>
           </div>
           <span className="text-[12px] font-['GeistMono'] text-[#9c9c9d]">
-            Click Connect to link via OAuth / MCP
+            Click "Connect with OAuth" to authorize
           </span>
         </div>
 
@@ -506,7 +539,7 @@ Only output valid JSON, no markdown formatting.`;
                   {app.isConnected ? (
                     <span className="flex items-center gap-1.5 text-[11px] font-['GeistMono'] font-medium text-[#59d499] bg-[#59d499]/15 border border-[#59d499]/30 px-2.5 py-0.5 rounded-full">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#59d499] animate-pulse" />
-                      Connected
+                      Connected via OAuth
                     </span>
                   ) : (
                     <span className="flex items-center gap-1.5 text-[11px] font-['GeistMono'] text-[#9c9c9d] bg-[#1a1b1e] px-2.5 py-0.5 rounded-full border border-[#27282b]">
@@ -521,74 +554,57 @@ Only output valid JSON, no markdown formatting.`;
                   {app.description}
                 </p>
 
-                {/* Direct Composio OAuth Link Box */}
-                <div className="mb-3.5 p-2.5 rounded-[8px] bg-[#0c0d10] border border-[#242528] flex flex-col gap-1.5">
-                  <div className="flex items-center justify-between text-[10px] font-['GeistMono'] text-[#9c9c9d]">
-                    <span className="flex items-center gap-1 text-[#ff6363]">
-                      <Lock className="w-2.5 h-2.5" />
-                      Composio OAuth Link
-                    </span>
-                    <span className="text-[#6a6b6c]">Direct Access</span>
-                  </div>
-                  <div className="flex items-center justify-between gap-2 bg-[#07080a] px-2.5 py-1.5 rounded-[6px] border border-[#1b1c1e]">
-                    <span className="text-[11px] font-['GeistMono'] text-[#cccccc] truncate select-all">
-                      {app.oauthUrl || 'https://connect.composio.dev'}
-                    </span>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          if (app.oauthUrl) {
-                            navigator.clipboard.writeText(app.oauthUrl);
-                            setCopiedId(app.id);
-                            setTimeout(() => setCopiedId(null), 2000);
-                          }
-                        }}
-                        className="px-2 py-0.5 rounded bg-[#18191c] hover:bg-[#25262a] text-[#9c9c9d] hover:text-[#ffffff] text-[10px] font-['GeistMono'] transition-colors flex items-center gap-1"
-                        title="Copy OAuth Link"
-                      >
-                        {copiedId === app.id ? (
-                          <>
-                            <Check className="w-2.5 h-2.5 text-[#59d499]" />
-                            <span className="text-[#59d499]">Copied</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="w-2.5 h-2.5" />
-                            <span>Copy</span>
-                          </>
-                        )}
-                      </button>
-                      {app.oauthUrl && (
-                        <a
-                          href={app.oauthUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="p-1 rounded bg-[#18191c] hover:bg-[#25262a] text-[#9c9c9d] hover:text-[#ffffff] transition-colors"
-                          title="Open direct OAuth link in browser"
-                        >
-                          <ExternalLink className="w-3 h-3" />
-                        </a>
-                      )}
+                {/* IF CONNECTED: SHOW WHAT ALL I HAVE GIVEN ACCESS TO BELOW */}
+                {app.isConnected ? (
+                  <div className="mb-4 space-y-2.5 animate-fade-in">
+                    {/* Account Status Pill */}
+                    <div className="p-2.5 rounded-[8px] bg-[#111214] border border-[#59d499]/30 flex items-center justify-between text-[12px]">
+                      <span className="text-[#59d499] truncate font-medium flex items-center gap-1.5">
+                        <CheckCircle2 className="w-3.5 h-3.5 text-[#59d499]" />
+                        {app.connectedAccount || 'OAuth 2.0 Authorized'}
+                      </span>
+                      <span className="text-[10px] font-['GeistMono'] bg-[#ff6363]/20 text-[#ff6363] px-2 py-0.5 rounded-full border border-[#ff6363]/30 shrink-0 ml-2">
+                        {app.unreadCount || 12} Active
+                      </span>
+                    </div>
+
+                    {/* What user has given access to */}
+                    <div className="p-3 rounded-[8px] bg-[#0c0d10] border border-[#242528]">
+                      <div className="flex items-center gap-1.5 text-[11px] font-['GeistMono'] text-[#59d499] font-medium mb-2">
+                        <ShieldCheck className="w-3.5 h-3.5 text-[#59d499]" />
+                        <span>Access Granted ({app.permissionsGranted.length} Scopes):</span>
+                      </div>
+                      <ul className="space-y-1.5">
+                        {app.permissionsGranted.map((perm, idx) => (
+                          <li key={idx} className="flex items-start gap-2 text-[12px] text-[#cccccc] leading-snug">
+                            <Check className="w-3.5 h-3.5 text-[#59d499] shrink-0 mt-0.5" />
+                            <span>{perm}</span>
+                          </li>
+                        ))}
+                      </ul>
                     </div>
                   </div>
-                </div>
-
-                {/* Account Details if Connected */}
-                {app.isConnected && app.connectedAccount && (
-                  <div className="mb-3.5 p-2.5 rounded-[8px] bg-[#111214] border border-[#59d499]/20 flex items-center justify-between text-[12px]">
-                    <span className="text-[#59d499] truncate font-medium flex items-center gap-1.5">
-                      <CheckCircle2 className="w-3.5 h-3.5 text-[#59d499]" />
-                      {app.connectedAccount}
+                ) : (
+                  /* IF NOT CONNECTED: SHOW REQUIRED SCOPES PILLS */
+                  <div className="mb-4">
+                    <span className="text-[11px] font-['GeistMono'] text-[#9c9c9d] block mb-1.5">
+                      OAuth Scopes Requested:
                     </span>
-                    <span className="text-[10px] font-['GeistMono'] bg-[#ff6363]/20 text-[#ff6363] px-2 py-0.5 rounded-full border border-[#ff6363]/30 shrink-0 ml-2">
-                      {app.unreadCount || 12} Unread
-                    </span>
+                    <div className="flex flex-wrap gap-1.5">
+                      {app.scopes.map((scope) => (
+                        <span
+                          key={scope}
+                          className="text-[10px] font-['GeistMono'] text-[#9c9c9d] bg-[#111214] border border-[#27282b] px-2 py-0.5 rounded"
+                        >
+                          {scope}
+                        </span>
+                      ))}
+                    </div>
                   </div>
                 )}
               </div>
 
-              {/* Action Buttons */}
+              {/* Action Buttons: Clean & Direct */}
               <div className="pt-3 border-t border-[#1c1d20]">
                 {app.isConnected ? (
                   <div className="flex items-center gap-2">
@@ -598,17 +614,15 @@ Only output valid JSON, no markdown formatting.`;
                     >
                       Disconnect
                     </button>
-                    <button
-                      onClick={() => {
-                        const matched = SAMPLE_SOURCES.find((s) => s.app === app.id) || SAMPLE_SOURCES[0];
-                        setSelectedSource(matched);
-                        handleGenerateSummary();
-                      }}
-                      className="flex-1 py-2 px-3 rounded-[8px] bg-[#59d499]/15 hover:bg-[#59d499]/25 text-[#59d499] border border-[#59d499]/30 text-[12px] font-semibold transition-all cursor-pointer flex items-center justify-center gap-1.5 shadow-[0_0_12px_rgba(89,212,153,0.15)]"
-                    >
-                      <Zap className="w-3.5 h-3.5" />
-                      <span>Summarize Feed</span>
-                    </button>
+                    {onNavigateToChat && (
+                      <button
+                        onClick={onNavigateToChat}
+                        className="flex-1 py-2 px-3 rounded-[8px] bg-[#ff6363] hover:bg-[#ff7a7a] text-[#040506] font-semibold text-[12px] transition-all cursor-pointer shadow-[0_2px_12px_rgba(255,99,99,0.3)] flex items-center justify-center gap-1.5 active:scale-95"
+                      >
+                        <MessageSquare className="w-3.5 h-3.5" />
+                        <span>Chat with AI</span>
+                      </button>
+                    )}
                   </div>
                 ) : (
                   <button

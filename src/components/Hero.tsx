@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { RaycastHeroScene } from './RaycastHeroScene';
 import { Sparkles, ArrowDown, ShieldCheck, Zap } from 'lucide-react';
+import { PlatformIcons } from './ComposioConnectSection';
 
 interface HeroProps {
   tagline: string;
@@ -89,8 +90,50 @@ export const Hero: React.FC<HeroProps> = ({
           </button>
         </div>
 
+        {/* Composio Platform Integrations Ribbon */}
+        <div className="mt-10 w-full max-w-[760px] p-3.5 rounded-[12px] bg-[#07080a]/90 border border-[#27282b] backdrop-blur-md flex flex-col sm:flex-row items-center justify-between gap-3 shadow-[0_8px_32px_rgba(0,0,0,0.6)]">
+          <div className="flex items-center gap-2.5 text-left">
+            <div className="w-8 h-8 rounded-[8px] bg-[#1b1c1e] border border-[#ff6363]/30 flex items-center justify-center shrink-0">
+              <PlatformIcons.Composio />
+            </div>
+            <div>
+              <div className="font-['Inter'] font-semibold text-[13px] text-[#ffffff] flex items-center gap-1.5">
+                <span>Unified Composio Connections</span>
+                <span className="text-[10px] font-['GeistMono'] text-[#ff6363] bg-[#ff6363]/15 px-1.5 py-0.2 rounded border border-[#ff6363]/30">
+                  Autonomous
+                </span>
+              </div>
+              <div className="font-['Inter'] text-[11px] text-[#9c9c9d]">
+                We link your tools once so you never have to read unread chats yourself.
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-1.5">
+            {[
+              { name: 'Microsoft Teams', Icon: PlatformIcons.Teams },
+              { name: 'Slack', Icon: PlatformIcons.Slack },
+              { name: 'Notion', Icon: PlatformIcons.Notion },
+              { name: 'GitHub', Icon: PlatformIcons.GitHub },
+              { name: 'Discord', Icon: PlatformIcons.Discord },
+              { name: 'Google Workspace', Icon: PlatformIcons.Google },
+            ].map(({ name, Icon }) => (
+              <button
+                key={name}
+                onClick={onOpenConnectWorkspace}
+                className="w-8 h-8 rounded-[8px] bg-[#111214] hover:bg-[#1a1b1e] border border-[#2f3031] hover:border-[#ff6363]/50 flex items-center justify-center transition-all cursor-pointer hover:scale-110"
+                title={`Connect ${name} via Composio`}
+              >
+                <div className="w-4 h-4 flex items-center justify-center">
+                  <Icon />
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
         {/* Clean Architecture Spec Pills */}
-        <div className="mt-10 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-[12px] font-['GeistMono'] text-[#9c9c9d]">
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-4 sm:gap-6 text-[12px] font-['GeistMono'] text-[#9c9c9d]">
           <div className="flex items-center gap-1.5">
             <Zap className="w-3.5 h-3.5 text-[#59d499]" />
             <span>&lt;1.2s Groq LPU Synthesis</span>

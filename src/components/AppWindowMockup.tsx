@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, CornerDownLeft, Check, ExternalLink } from 'lucide-react';
+import { Search, CornerDownLeft, Check, ExternalLink, Sparkles } from 'lucide-react';
 import type { CommandItem } from '../config/siteConfig';
 import { IconHelper } from './IconHelper';
 

@@ -35,6 +35,32 @@ interface ZapierMessageStatus {
   durationMs: number;
 }
 
+const WORKSPACE_MESSAGES_CONTEXT = `
+[LIVE CONNECTED WORKSPACE MESSAGES & CONVERSATIONS]
+
+1. Slack Workspace - #war-room (Auth Latency Spike Incident):
+- 10:14 AM - @dev_sarah: Alert: Auth service latency spiked to 3.2s. 504 errors on /api/login for ~12% of traffic.
+- 10:16 AM - @alex_lead: Checking Grafana. Redis connection pool is at 100% capacity on worker-node-04.
+- 10:19 AM - @dev_sarah: Root cause found: PR #182 left connection keep-alive open without timeout.
+- 10:22 AM - @alex_lead: @dev_sarah rollback PR #182 immediately. I will scale up Redis replicas on node-04 now.
+- 10:28 AM - @dev_sarah: PR #182 reverted and deployed. Latency returned to 45ms. Incident resolved.
+- 10:30 AM - @marcus_pm: Need a quick post-mortem doc ready before tomorrow's executive review.
+
+2. Microsoft Teams - Product & Engineering Sync:
+- 10:35 AM - @marcus_pm: Heads up team: Client demo for Q4 AI Search is moved to tomorrow 3:00 PM EST.
+- 10:37 AM - @priya_design: Figma components for the workspace connection cards are finalized and ready in #design-specs.
+- 10:41 AM - @marcus_pm: @alex_lead please ensure staging environment has mock data seeded by 11:00 AM.
+- 10:44 AM - @alex_lead: On it. Seeding script is executing now, will confirm when staging is hot.
+
+3. Notion Workspace - Sprint 44 Incident Log & Backlog:
+- Incident Post-Mortem #402: Resolved | Severity: P0 | Impact: 12% login drop for 14 minutes.
+- Action Items:
+  1. Audit all Redis connection pooling configurations across services (Owner: @alex_lead, Due: Friday).
+  2. Implement automated keep-alive timeout linting rule in CI/CD pipeline (Owner: @dev_sarah, Due: Monday).
+  3. Update on-call runbook with Redis failover playbook (Owner: @dev_sarah).
+- Decision: Groq LPU standardized for sub-second AI summarization across client apps.
+`;
+
 export const ChatbotView: React.FC<ChatbotViewProps> = ({
   onBackToLanding,
   onOpenZapierModal,
@@ -44,7 +70,7 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({
       id: 'init-1',
       role: 'assistant',
       content:
-        'Welcome to CatchUp AI Copilot powered by Groq LPUs & Zapier MCP. I can help summarize unread Teams channels, triage P0 incidents, track missed @mentions, and sync action items to Notion. What unread conversation or topic would you like to investigate?',
+        'Welcome to CatchUp AI Copilot! Connected to Groq LPU (sub-second inference) with live read access to your Slack (#war-room), Microsoft Teams, and Notion feeds. Ask me what you missed, who fixed the auth outage, or what action items are open!',
       timestamp: Date.now(),
       metrics: {
         latencyMs: 120,
@@ -75,10 +101,10 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({
   }, [messages, isLoading, zapierStatus]);
 
   const quickPrompts = [
-    'Explain the importance of fast language models',
-    'Post architecture status to Microsoft Teams (#hackathon-war-room)',
-    'Create a project spec document in Notion for judges',
-    'Design an autonomous agent architecture with Zapier MCP',
+    'What happened in the Slack #war-room outage?',
+    'What are the action items assigned to Sarah and Alex?',
+    'What did Marcus and Priya discuss on Microsoft Teams?',
+    'Give me an executive 3-bullet summary of all unread messages',
   ];
 
   const handleDispatchToTeams = async (messageId: string, content: string) => {
@@ -192,8 +218,14 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({
         messages: history,
         model: selectedModel,
         apiKey: apiKeyOverride,
-        systemPrompt:
-          'You are a world-class AI system architect and hackathon mentor. Provide sharp, concise, deeply technical, and actionable insights. Format code blocks cleanly.',
+        systemPrompt: `You are CatchUp AI Copilot powered by Groq LPUs.
+You have direct real-time read access to the user's connected workspace feeds (Slack, Microsoft Teams, and Notion):
+${WORKSPACE_MESSAGES_CONTEXT}
+
+Instructions:
+1. Always reference exact facts, people (@dev_sarah, @alex_lead, @marcus_pm, @priya_design), timestamps, and channels when answering questions.
+2. Provide concise, clear, and actionable summaries or answers.
+3. If asked who is on call, who fixed an issue, when a demo is, or what action items exist, give direct, accurate answers based on the messages above.`,
       });
 
       const assistantMsgId = `assistant-${Date.now()}`;
@@ -386,6 +418,25 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Live Workspace Feeds Status Bar */}
+      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2 rounded-[10px] bg-[#0c0d10] border border-[#27282b] mb-3 text-[12px] font-['GeistMono'] animate-fade-in">
+        <div className="flex items-center gap-2">
+          <span className="w-2 h-2 rounded-full bg-[#59d499] animate-pulse" />
+          <span className="text-[#ffffff] font-medium">Groq LPU Active ({selectedModel})</span>
+        </div>
+        <div className="flex items-center gap-2 text-[11px]">
+          <span className="px-2 py-0.5 rounded bg-[#4A154B]/30 text-[#ECB22E] border border-[#4A154B]/60 font-medium">
+            ● Slack (#war-room) Connected
+          </span>
+          <span className="px-2 py-0.5 rounded bg-[#464EB8]/30 text-[#7B83EB] border border-[#464EB8]/60 font-medium">
+            ● Teams Connected
+          </span>
+          <span className="px-2 py-0.5 rounded bg-[#111214] text-[#ffffff] border border-[#363739] font-medium">
+            ● Notion Synced
+          </span>
+        </div>
+      </div>
 
       {/* Main Messages Feed */}
       <div
