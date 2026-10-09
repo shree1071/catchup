@@ -29,13 +29,55 @@ async function callComposioMcpTool(name, args) {
   return { ok: true, data: rpcRes.result };
 }
 
+// Lightweight in-memory sliding window rate limiter (60 req / min per IP)
+const rateLimitMap = new Map();
+function checkRateLimit(ip) {
+  const now = Date.now();
+  const windowMs = 60 * 1000;
+  const maxRequests = 60;
+  const record = rateLimitMap.get(ip) || { count: 0, resetTime: now + windowMs };
+
+  if (now > record.resetTime) {
+    record.count = 1;
+    record.resetTime = now + windowMs;
+    rateLimitMap.set(ip, record);
+    return { allowed: true, remaining: maxRequests - 1 };
+  }
+
+  if (record.count >= maxRequests) {
+    return { allowed: false, remaining: 0, retryAfter: Math.ceil((record.resetTime - now) / 1000) };
+  }
+
+  record.count++;
+  rateLimitMap.set(ip, record);
+  return { allowed: true, remaining: maxRequests - record.count };
+}
+
 export default async function handler(req, res) {
-  res.setHeader('Access-Control-Allow-Origin', '*');
+  // Origin-validated CORS (allow localhost, vercel deployments, or same-origin)
+  const origin = req.headers.origin || '';
+  const isAllowedOrigin =
+    !origin ||
+    origin.includes('localhost') ||
+    origin.includes('127.0.0.1') ||
+    origin.endsWith('.vercel.app');
+
+  res.setHeader('Access-Control-Allow-Origin', isAllowedOrigin ? (origin || '*') : 'null');
   res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
   res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization');
 
   if (req.method === 'OPTIONS') {
     return res.status(200).end();
+  }
+
+  // Rate Limiting (60 requests per minute per client IP)
+  const clientIp = (req.headers['x-forwarded-for'] || '').split(',')[0].trim() || req.socket?.remoteAddress || 'unknown';
+  const rateLimit = checkRateLimit(clientIp);
+  res.setHeader('X-RateLimit-Limit', '60');
+  res.setHeader('X-RateLimit-Remaining', String(rateLimit.remaining));
+  if (!rateLimit.allowed) {
+    res.setHeader('Retry-After', String(rateLimit.retryAfter));
+    return res.status(429).json({ success: false, error: 'Too many requests. Rate limit is 60 requests per minute.' });
   }
 
   // Input validation: reject oversized request bodies

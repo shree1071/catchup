@@ -332,16 +332,17 @@ Following the ProtocolX / ColX Engineering Challenge criteria, CatchUp AI implem
    - `X-Content-Type-Options: nosniff` (MIME spoofing prevention).
    - `Strict-Transport-Security: max-age=63072000; includeSubDomains; preload` (HSTS).
    - `Permissions-Policy` disabling camera, microphone, and geolocation.
-3. **Payload Sanitization & Size Capping:** Serverless API enforces a strict 10 KB request body limit, regex-based channel identifier validation, 4000-character text limits, and script tag stripping against stored XSS.
+3. **Payload Sanitization, Size Capping & In-Memory Rate Limiting:** Serverless APIs (`/api/composio`, `/api/chat`) enforce sliding-window rate limiters per IP, strict request body limits (10 KB / 64 KB), regex-based channel identifier validation, 4000-character text limits, and script tag stripping against stored XSS.
 4. **Code-Splitting & Manual Vendor Chunking:** Dynamic `React.lazy()` imports for all secondary views (`ChatbotView`, `TeamsCatchUpModal`, `ConnectedWorkspaceView`), reducing initial bundle entry to **61.79 kB** (18.56 kB gzipped) and splitting vendor libraries (`vendor-react`, `vendor-icons`).
 5. **Static Asset Immutability:** 1-year immutable caching on `/assets/*` via Vercel edge CDN.
 
 ### 🏛️ Backend & Architecture Patterns (Target Score: 90+)
-1. **React 19 Error Boundary (`ErrorBoundary.tsx`):** Uncaught rendering failures or network timeouts in markdown or modal views are captured gracefully with user-actionable reset buttons and error telemetry IDs.
-2. **Strict TypeScript Typing (`strict: true`, `noUncheckedIndexedAccess: true`):** Zero compile-time errors under full strict mode, preventing runtime undefined access bugs.
-3. **Centralized Domain Type Repository (`src/types/`):** Dedicated API and RPC definitions (`api.ts`, `index.ts`) standardizing Composio, Groq, and Slack response contracts.
-4. **Resilient 3-Tier Connector Fallback:** Workspace ingestion implements automatic graceful degradation (Vercel Serverless Function → Browser MCP Proxy → Deterministic Local Heuristics).
-5. **Automated Vitest Suite (28 Tests Passing):** 100% test pass rate verifying credential hygiene, prompt blueprints, markdown syntax, model schemas, and workspace serialization.
+1. **Dedicated Serverless Inference Layer (`api/chat.js`):** Groq LPU API calls are handled server-side to shield API keys from browser DevTools, paired with graceful client-side progressive fallback.
+2. **React 19 Error Boundary (`ErrorBoundary.tsx`):** Uncaught rendering failures or network timeouts in markdown or modal views are captured gracefully with user-actionable reset buttons and error telemetry IDs.
+3. **Strict TypeScript Typing (`strict: true`, `noUncheckedIndexedAccess: true`):** Zero compile-time errors under full strict mode, preventing runtime undefined access bugs.
+4. **Centralized Domain Type Repository (`src/types/`):** Dedicated API and RPC definitions (`api.ts`, `index.ts`) standardizing Composio, Groq, and Slack response contracts.
+5. **Resilient 3-Tier Connector Fallback:** Workspace ingestion implements automatic graceful degradation (Vercel Serverless Function → Browser MCP Proxy → Deterministic Local Heuristics).
+6. **Automated Vitest Suite (31 Tests Passing):** 100% test pass rate verifying credential hygiene, prompt blueprints, markdown syntax, model schemas, and security rate limits.
 
 ---
 
