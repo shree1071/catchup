@@ -16,7 +16,12 @@ import {
 } from 'lucide-react';
 import {
   summarizeTeamsChatWithGroq,
+  OLLAMA_MODELS,
+  checkOllamaStatus,
+  DEFAULT_OLLAMA_MODEL,
+  DEFAULT_OLLAMA_BASE_URL,
   type TeamsCatchUpSummary,
+  type AIProvider,
 } from '../services/groqService';
 import { executeZapierMcpAction } from '../services/zapierMcpService';
 
@@ -90,10 +95,26 @@ export const TeamsCatchUpModal: React.FC<TeamsCatchUpModalProps> = ({
   const [activeTab, setActiveTab] = useState<'summary' | 'transcript' | 'custom'>('summary');
   const [actionItemsStatus, setActionItemsStatus] = useState<Record<string, boolean>>({});
   const [syncingApp, setSyncingApp] = useState<string | null>(null);
-  const [privacyMode, setPrivacyMode] = useState<'groq' | 'local'>('groq');
+  const [aiProvider, setAiProvider] = useState<AIProvider>('groq');
+  const [selectedOllamaModel, setSelectedOllamaModel] = useState<string>(DEFAULT_OLLAMA_MODEL);
+  const [customModelInput, setCustomModelInput] = useState<string>('');
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState<string>(DEFAULT_OLLAMA_BASE_URL);
+  const [ollamaStatus, setOllamaStatus] = useState<{ isRunning: boolean; version?: string } | null>(null);
+  const [isCheckingOllama, setIsCheckingOllama] = useState<boolean>(false);
 
   const activeChannel =
     TEAMS_CHANNELS.find((c) => c.id === selectedChannelId) || TEAMS_CHANNELS[0];
+
+  // Auto-check Ollama status whenever user selects ollama provider
+  useEffect(() => {
+    if (isOpen && aiProvider === 'ollama') {
+      setIsCheckingOllama(true);
+      checkOllamaStatus(ollamaBaseUrl)
+        .then((st) => setOllamaStatus(st))
+        .catch(() => setOllamaStatus({ isRunning: false }))
+        .finally(() => setIsCheckingOllama(false));
+    }
+  }, [isOpen, aiProvider, ollamaBaseUrl]);
 
   // Auto-summarize when modal opens or channel changes
   useEffect(() => {
@@ -115,22 +136,35 @@ export const TeamsCatchUpModal: React.FC<TeamsCatchUpModalProps> = ({
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, selectedChannelId, isCustomMode, customChatText]);
+  }, [isOpen, selectedChannelId, isCustomMode, customChatText, aiProvider, selectedOllamaModel, customModelInput]);
 
   const handleRunSummary = async () => {
     setIsProcessing(true);
     const contentToAnalyze = isCustomMode ? customChatText : activeChannel.chat;
     const channelName = isCustomMode ? 'Custom Teams Chat' : activeChannel.name;
     const unreadCount = isCustomMode ? 20 : activeChannel.unreadCount;
+    const effectiveOllamaModel =
+      selectedOllamaModel === 'custom'
+        ? customModelInput.trim() || 'llama3.2'
+        : selectedOllamaModel;
 
     try {
       const result = await summarizeTeamsChatWithGroq({
         chatContent: contentToAnalyze,
         channelName,
         unreadCount,
+        provider: aiProvider,
+        ollamaModel: effectiveOllamaModel,
+        ollamaBaseUrl: ollamaBaseUrl,
       });
       setSummaryData(result);
-      onNotify?.(`Summarized ${unreadCount} unread Teams messages via Groq LPU (${result.metrics.latencyMs}ms)`);
+      if (result.providerUsed === 'ollama') {
+        onNotify?.(`Summarized 100% locally with Ollama edge (${effectiveOllamaModel}) in ${result.metrics.latencyMs}ms`);
+      } else if (result.providerUsed === 'local') {
+        onNotify?.(`Summarized ${unreadCount} unread messages with zero-dependency local heuristics`);
+      } else {
+        onNotify?.(`Summarized ${unreadCount} unread Teams messages via Groq LPU (${result.metrics.latencyMs}ms)`);
+      }
     } catch (e: any) {
       onNotify?.(`Summarization failed: ${e.message}`);
     } finally {
@@ -221,34 +255,65 @@ export const TeamsCatchUpModal: React.FC<TeamsCatchUpModalProps> = ({
                 </span>
               </div>
               <p className="text-[11px] text-[#9c9c9d] font-['Inter']">
-                Connected via Zapier MCP • Summarizing unread conversations with Groq LPU
+                {aiProvider === 'ollama'
+                  ? 'Local-First Edge • 100% on-device Ollama inference (Zero cloud telemetry)'
+                  : aiProvider === 'local'
+                  ? 'Deterministic Regex Engine • Zero-dependency offline analysis'
+                  : 'Connected via Zapier MCP • Summarizing unread conversations with Groq LPU'}
               </p>
             </div>
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Privacy Mode Switcher */}
-            <button
-              onClick={() => setPrivacyMode((p) => (p === 'groq' ? 'local' : 'groq'))}
-              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[6px] text-[11px] font-['GeistMono'] border transition-all cursor-pointer ${
-                privacyMode === 'groq'
-                  ? 'bg-[#ff6363]/10 text-[#ff6363] border-[#ff6363]/30'
-                  : 'bg-[#59d499]/10 text-[#59d499] border-[#59d499]/30'
-              }`}
-              title="Toggle between Groq Cloud Acceleration and 100% Local-First Edge Execution"
-            >
-              {privacyMode === 'groq' ? (
-                <>
-                  <Sparkles className="w-3 h-3" />
-                  <span>⚡ Groq LPU (gpt-oss-20b)</span>
-                </>
-              ) : (
-                <>
-                  <ShieldCheck className="w-3 h-3" />
-                  <span>🔒 100% Local-First Edge</span>
-                </>
-              )}
-            </button>
+            {/* 3-Way AI Provider Selector */}
+            <div className="flex items-center p-0.5 rounded-[7px] bg-[#101114] border border-[#232427]">
+              <button
+                onClick={() => {
+                  setAiProvider('groq');
+                  setSummaryData(null);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] text-[11px] font-['GeistMono'] transition-all cursor-pointer ${
+                  aiProvider === 'groq'
+                    ? 'bg-[#ff6363]/15 text-[#ff6363] border border-[#ff6363]/40 shadow-[0_0_8px_rgba(255,99,99,0.2)] font-medium'
+                    : 'text-[#9c9c9d] hover:text-[#ffffff] border border-transparent'
+                }`}
+                title="Groq LPU: Cloud acceleration with ultra-fast inference"
+              >
+                <Sparkles className="w-3 h-3" />
+                <span>⚡ Groq LPU</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setAiProvider('ollama');
+                  setSummaryData(null);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] text-[11px] font-['GeistMono'] transition-all cursor-pointer ${
+                  aiProvider === 'ollama'
+                    ? 'bg-[#59d499]/15 text-[#59d499] border border-[#59d499]/40 shadow-[0_0_8px_rgba(89,212,153,0.2)] font-medium'
+                    : 'text-[#9c9c9d] hover:text-[#ffffff] border border-transparent'
+                }`}
+                title="100% Local Ollama: Bring Your Own Model, air-gapped on-device execution"
+              >
+                <ShieldCheck className="w-3 h-3" />
+                <span>🦙 Ollama (BYOM)</span>
+              </button>
+
+              <button
+                onClick={() => {
+                  setAiProvider('local');
+                  setSummaryData(null);
+                }}
+                className={`flex items-center gap-1.5 px-2.5 py-1 rounded-[5px] text-[11px] font-['GeistMono'] transition-all cursor-pointer ${
+                  aiProvider === 'local'
+                    ? 'bg-[#7b83eb]/15 text-[#7b83eb] border border-[#7b83eb]/40 font-medium'
+                    : 'text-[#9c9c9d] hover:text-[#ffffff] border border-transparent'
+                }`}
+                title="Offline Regex: Deterministic heuristic parser without neural network"
+              >
+                <span>🔒 Heuristic</span>
+              </button>
+            </div>
 
             <button
               onClick={onClose}
@@ -258,6 +323,86 @@ export const TeamsCatchUpModal: React.FC<TeamsCatchUpModalProps> = ({
             </button>
           </div>
         </div>
+
+        {/* Ollama Local Edge Configuration Strip (when Ollama is active) */}
+        {aiProvider === 'ollama' && (
+          <div className="px-4 sm:px-6 py-2 bg-[#08090c] border-b border-[#1b1c1e] flex flex-wrap items-center justify-between gap-3 text-[11px] font-['GeistMono']">
+            <div className="flex items-center gap-2.5 flex-wrap">
+              <span className="text-[#59d499] font-medium flex items-center gap-1.5">
+                <ShieldCheck className="w-3.5 h-3.5" />
+                <span>Local Model (BYOM):</span>
+              </span>
+
+              {/* Model Dropdown */}
+              <select
+                value={selectedOllamaModel}
+                onChange={(e) => {
+                  setSelectedOllamaModel(e.target.value);
+                  setSummaryData(null);
+                }}
+                className="bg-[#111214] border border-[#27282b] text-[#ffffff] px-2.5 py-0.5 rounded-[5px] focus:outline-none focus:border-[#59d499] cursor-pointer"
+              >
+                {OLLAMA_MODELS.map((m) => (
+                  <option key={m.id} value={m.id}>
+                    {m.name} ({m.size})
+                  </option>
+                ))}
+                <option value="custom">+ Custom BYOM Model Tag...</option>
+              </select>
+
+              {/* Custom Model Input */}
+              {selectedOllamaModel === 'custom' && (
+                <input
+                  type="text"
+                  value={customModelInput}
+                  onChange={(e) => setCustomModelInput(e.target.value)}
+                  placeholder="e.g. deepseek-r1:1.5b, mistral, custom-rag"
+                  className="bg-[#111214] border border-[#27282b] text-[#59d499] px-2.5 py-0.5 rounded-[5px] focus:outline-none focus:border-[#59d499] w-48"
+                />
+              )}
+
+              <div className="flex items-center gap-1.5 hidden md:flex">
+                <span className="text-[#6a6b6c]">Host:</span>
+                <input
+                  type="text"
+                  value={ollamaBaseUrl}
+                  onChange={(e) => setOllamaBaseUrl(e.target.value)}
+                  placeholder="http://localhost:11434"
+                  className="bg-[#111214] border border-[#27282b] text-[#9c9c9d] hover:text-[#ffffff] focus:text-[#ffffff] px-2 py-0.5 rounded-[4px] w-40 font-['GeistMono'] text-[11px] focus:outline-none focus:border-[#59d499]"
+                />
+              </div>
+            </div>
+
+            {/* Probe Status */}
+            <div className="flex items-center gap-2">
+              {isCheckingOllama ? (
+                <span className="text-[#9c9c9d] flex items-center gap-1">
+                  <RefreshCw className="w-3 h-3 animate-spin" /> Probing Ollama...
+                </span>
+              ) : ollamaStatus?.isRunning ? (
+                <span className="text-[#59d499] flex items-center gap-1.5 px-2 py-0.5 rounded-[4px] bg-[#59d499]/10 border border-[#59d499]/20">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#59d499] animate-pulse" />
+                  <span>Ollama Running ({ollamaStatus.version || 'Edge'})</span>
+                </span>
+              ) : (
+                <div className="flex items-center gap-1.5">
+                  <span className="text-[#ffbd59] flex items-center gap-1 px-2 py-0.5 rounded-[4px] bg-[#ffbd59]/10 border border-[#ffbd59]/20">
+                    <span>● Ollama Inactive</span>
+                  </span>
+                  <button
+                    onClick={() => {
+                      setIsCheckingOllama(true);
+                      checkOllamaStatus(ollamaBaseUrl).then(setOllamaStatus).finally(() => setIsCheckingOllama(false));
+                    }}
+                    className="text-[#9c9c9d] hover:text-[#ffffff] underline text-[10px] cursor-pointer"
+                  >
+                    Retry
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
 
         {/* Channel Selector Bar & Tabs */}
         <div className="px-4 sm:px-6 py-2.5 bg-[#0b0c0f] border-b border-[#1b1c1e] flex flex-wrap items-center justify-between gap-3 shrink-0">
@@ -330,7 +475,15 @@ export const TeamsCatchUpModal: React.FC<TeamsCatchUpModalProps> = ({
               className="flex items-center gap-1.5 bg-[#ffffff] hover:bg-[#e6e6e6] text-[#040506] px-3 py-1 rounded-[6px] text-[12px] font-['Inter'] font-semibold transition-all cursor-pointer shadow-[0_2px_8px_rgba(0,0,0,0.4)] disabled:opacity-50"
             >
               <RefreshCw className={`w-3 h-3 ${isProcessing ? 'animate-spin' : ''}`} />
-              <span>{isProcessing ? 'Reasoning on Groq...' : 'Re-summarize (⌘⏎)'}</span>
+              <span>
+                {isProcessing
+                  ? aiProvider === 'ollama'
+                    ? 'Running Local Ollama...'
+                    : aiProvider === 'local'
+                    ? 'Extracting Regex...'
+                    : 'Reasoning on Groq...'
+                  : 'Re-summarize (⌘⏎)'}
+              </span>
             </button>
           </div>
         </div>
@@ -342,12 +495,22 @@ export const TeamsCatchUpModal: React.FC<TeamsCatchUpModalProps> = ({
             <>
               {isProcessing && (
                 <div className="flex flex-col items-center justify-center py-16 space-y-3">
-                  <div className="w-10 h-10 rounded-full border-2 border-[#ff6363] border-t-transparent animate-spin" />
+                  <div className={`w-10 h-10 rounded-full border-2 border-t-transparent animate-spin ${
+                    aiProvider === 'ollama' ? 'border-[#59d499]' : 'border-[#ff6363]'
+                  }`} />
                   <span className="font-['Inter'] text-[14px] text-[#ffffff] font-medium">
-                    Groq LPU is analyzing {activeChannel.unreadCount} unread Teams messages...
+                    {aiProvider === 'ollama'
+                      ? `Local Ollama is analyzing ${activeChannel.unreadCount} unread Teams messages...`
+                      : aiProvider === 'local'
+                      ? `Deterministic heuristic parser analyzing ${activeChannel.unreadCount} messages...`
+                      : `Groq LPU is analyzing ${activeChannel.unreadCount} unread Teams messages...`}
                   </span>
                   <span className="font-['GeistMono'] text-[11px] text-[#6a6b6c]">
-                    Model: openai/gpt-oss-20b • Zero-retention client memory
+                    {aiProvider === 'ollama'
+                      ? `Model: ${selectedOllamaModel === 'custom' ? customModelInput || 'custom' : selectedOllamaModel} • 100% Air-gapped on-device execution`
+                      : aiProvider === 'local'
+                      ? 'Local Heuristic Engine • Zero API dependencies'
+                      : 'Model: openai/gpt-oss-20b • Zero-retention client memory'}
                   </span>
                 </div>
               )}
@@ -369,15 +532,30 @@ export const TeamsCatchUpModal: React.FC<TeamsCatchUpModalProps> = ({
                         <AlertTriangle className="w-4 h-4" />
                       </div>
                       <div>
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-2 flex-wrap">
                           <span className="font-['Inter'] font-bold text-[13px] tracking-wide">
                             PRIORITY TRIAGE: {summaryData.urgencyLevel}
                           </span>
                           <span className="font-['GeistMono'] text-[10px] opacity-80">
                             • {summaryData.unreadCount} unread messages
                           </span>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-['GeistMono'] font-medium ${
+                              summaryData.providerUsed === 'ollama'
+                                ? 'bg-[#59d499]/20 text-[#59d499] border border-[#59d499]/40'
+                                : summaryData.providerUsed === 'local'
+                                ? 'bg-[#7b83eb]/20 text-[#7b83eb] border border-[#7b83eb]/40'
+                                : 'bg-[#ff6363]/20 text-[#ff6363] border border-[#ff6363]/40'
+                            }`}
+                          >
+                            {summaryData.providerUsed === 'ollama'
+                              ? `🦙 100% Local Ollama (${summaryData.modelUsed || selectedOllamaModel})`
+                              : summaryData.providerUsed === 'local'
+                              ? '🔒 Local Offline Regex'
+                              : `⚡ Groq Cloud LPU (${summaryData.modelUsed || 'gpt-oss-20b'})`}
+                          </span>
                         </div>
-                        <p className="font-['Inter'] text-[12px] opacity-90 mt-0.5">
+                        <p className="font-['Inter'] text-[12px] opacity-90 mt-1">
                           {summaryData.urgencyReason}
                         </p>
                       </div>

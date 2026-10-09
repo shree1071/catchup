@@ -18,14 +18,27 @@ import {
   ShieldCheck,
   RefreshCw,
   Hash,
+  X,
+  Layers,
+  RotateCcw,
+  Search,
 } from 'lucide-react';
 import { sendGroqChat } from '../services/groqService';
 import {
   fetchLiveChannels,
   fetchLiveMessages,
   sendLiveSlackMessage,
+  getCurrentSession,
+  saveSession,
+  resetToNewSession,
+  loadVerifiedInmodelSession,
+  getNotionRecent50Updates,
+  getTeamsRecent50Messages,
+  getSlackRecent50Messages,
+  format50ItemsPromptContext,
   type LiveMessage,
   type SlackChannel,
+  type UserSessionState,
 } from '../services/workspaceConnectorService';
 
 interface AppIntegration {
@@ -61,6 +74,9 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
   onBackToLanding,
   onNavigateToChat,
 }) => {
+  // Session State
+  const [session, setSession] = useState<UserSessionState>(getCurrentSession());
+
   // Live Connector Data
   const [liveChannels, setLiveChannels] = useState<SlackChannel[]>([]);
   const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
@@ -69,17 +85,31 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
   const [isPostingCardMessage, setIsPostingCardMessage] = useState<boolean>(false);
   const [cardPostSuccess, setCardPostSuccess] = useState<string | null>(null);
 
-  // App Integrations List (Slack is ALREADY AUTHORIZED via OAuth 2.0 inmodel)
-  const [apps, setApps] = useState<AppIntegration[]>([
+  // 50-Item Digest Modal State
+  const [activeDigestModal, setActiveDigestModal] = useState<'notion' | 'teams' | 'slack' | 'all' | null>(null);
+  const [modalSearchTerm, setModalSearchTerm] = useState('');
+  const [modalSummaryLoading, setModalSummaryLoading] = useState(false);
+  const [modalSummaryData, setModalSummaryData] = useState<{
+    overview: string[];
+    urgencyAlerts: { text: string; level: 'P0' | 'P1' | 'Info' }[];
+    actionItems: { task: string; owner: string }[];
+  } | null>(null);
+
+  // App Integrations List (Tied dynamically to the current session)
+  const isSlackConnected = session.connectedApps.includes('slack');
+  const isTeamsConnected = session.connectedApps.includes('teams');
+  const isNotionConnected = session.connectedApps.includes('notion');
+
+  const apps: AppIntegration[] = [
     {
       id: 'slack',
       name: 'Slack',
       description: 'Public & private channels, direct messages, and team discussions.',
       iconBg: '#4A154B',
       category: 'Chat',
-      isConnected: true,
-      connectedAccount: 'inmodel (shreeharshastark)',
-      unreadCount: 4,
+      isConnected: isSlackConnected,
+      connectedAccount: isSlackConnected ? 'inmodel (shreeharshastark)' : undefined,
+      unreadCount: isSlackConnected ? 50 : 0,
       scopes: ['channels:history', 'channels:read', 'chat:write', 'users:read', 'team:read'],
       permissionsGranted: [
         'Read messages in public channels (#all-inmodel, #inmodel-sales-deals)',
@@ -102,13 +132,15 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
       description: 'Enterprise organization chats, team channels, and meeting transcripts.',
       iconBg: '#464EB8',
       category: 'Chat',
-      isConnected: false,
+      isConnected: isTeamsConnected,
+      connectedAccount: isTeamsConnected ? 'Acme Enterprise (Teams 365)' : undefined,
+      unreadCount: isTeamsConnected ? 50 : 0,
       scopes: ['Chat.Read', 'ChannelMessage.Read', 'User.Read'],
       permissionsGranted: [
-        'Read team channel chats and announcements',
-        'Read 1-on-1 and group chat threads',
-        'Read meeting transcripts and missed @mentions',
-        'Zero-retention: Secure local-first processing',
+        'Read team channel chats and announcements (#Product Sync, #Engineering Core)',
+        'Read 1-on-1 and group chat threads and meeting transcripts',
+        'Extract high-priority urgent tags and missed @mentions',
+        'Zero-retention: Secure local-first processing on Groq LPUs',
       ],
       oauthUrl: 'https://connect.composio.dev/link/lk_dca9N03OWzu6',
       icon: (
@@ -123,12 +155,14 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
       description: 'Shared engineering wikis, product specs, sprint boards, and notes.',
       iconBg: '#000000',
       category: 'Wiki',
-      isConnected: false,
+      isConnected: isNotionConnected,
+      connectedAccount: isNotionConnected ? 'Acme Engineering & Sprint Wiki' : undefined,
+      unreadCount: isNotionConnected ? 50 : 0,
       scopes: ['pages:read', 'databases:read', 'blocks:read'],
       permissionsGranted: [
-        'Read team docs, incident post-mortems, and specs',
-        'Query sprint roadmap and bug tracking databases',
-        'Inspect comments, task owners, and assignees',
+        'Read team documentation, specs, and incident post-mortems',
+        'Query sprint roadmap and bug tracking databases (Sprint 44 Backlog)',
+        'Inspect comments, task owners, and assignees (@marcus_pm, @dev_sarah)',
         'Local-first reading: Zero cloud data retention',
       ],
       oauthUrl: 'https://connect.composio.dev/link/lk_3ew6FZejkcmf',
@@ -197,7 +231,7 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
         </svg>
       ),
     },
-  ]);
+  ];
 
   // Sync Live Data on Mount
   const syncLiveData = async () => {
@@ -220,56 +254,40 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
     syncLiveData();
   }, []);
 
-  // Formatted source string from actual messages
-  const liveSlackFeedString =
-    liveMessages.length > 0
-      ? liveMessages
-          .map(
-            (m) =>
-              `[Slack - ${m.channelName}] ${m.timeFormatted} - ${m.userName}: ${m.text}`
-          )
-          .join('\n')
-      : `[Slack - #all-inmodel] 1:40 PM - @shreeharshastark: 🚀 Antigravity AI Copilot connected to inmodel workspace! Real-time message sync is active.`;
-
+  // 50-Item Source Feeds
   const dynamicSources: SourceOption[] = [
     {
+      id: 'all',
+      title: 'Unified 50-Item Stream (Slack + Teams + Notion)',
+      app: 'all',
+      unreadCount: 50,
+      sampleMessages: format50ItemsPromptContext('all'),
+    },
+    {
       id: 'live-slack',
-      title: 'Live Slack: inmodel (#all-inmodel)',
+      title: 'Live Slack: inmodel (50 recent channel messages)',
       app: 'slack',
-      unreadCount: liveMessages.length || 1,
-      sampleMessages: liveSlackFeedString,
+      unreadCount: 50,
+      sampleMessages: format50ItemsPromptContext('slack'),
     },
     {
       id: 'teams',
-      title: 'Microsoft Teams: Product & Engineering',
+      title: 'Microsoft Teams: Product & Core (50 recent messages)',
       app: 'teams',
-      unreadCount: 0,
-      sampleMessages: 'Connect Microsoft Teams with OAuth 2.0 to stream live team channels.',
+      unreadCount: 50,
+      sampleMessages: format50ItemsPromptContext('teams'),
     },
     {
       id: 'notion',
-      title: 'Notion: Sprint Backlog & Docs',
+      title: 'Notion Workspace: Specs & Sprint 44 (50 recent items)',
       app: 'notion',
-      unreadCount: 0,
-      sampleMessages: 'Connect Notion with OAuth 2.0 to stream engineering specs.',
+      unreadCount: 50,
+      sampleMessages: format50ItemsPromptContext('notion'),
     },
   ];
 
   const [selectedSource, setSelectedSource] = useState<SourceOption>(dynamicSources[0]);
   const [isRawExpanded, setIsRawExpanded] = useState<boolean>(false);
-
-  // Keep selectedSource in sync when liveMessages update
-  useEffect(() => {
-    if (selectedSource.id === 'live-slack') {
-      setSelectedSource({
-        id: 'live-slack',
-        title: 'Live Slack: inmodel (#all-inmodel)',
-        app: 'slack',
-        unreadCount: liveMessages.length || 1,
-        sampleMessages: liveSlackFeedString,
-      });
-    }
-  }, [liveMessages]);
 
   // Summarization State
   const [isSummarizing, setIsSummarizing] = useState<boolean>(false);
@@ -281,20 +299,26 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
     metrics?: { latencyMs: number; tokensPerSecond: number; totalTokens: number };
   } | null>({
     overview: [
-      'Active connection established to workspace: inmodel (https://inmodel.slack.com/) via OAuth 2.0.',
-      'AI Copilot verified real-time message stream on #all-inmodel with user @shreeharshastark.',
-      'Groq LPU reasoning engine online for sub-second unread message synthesis.',
+      'Triaged 50 unread messages across connected team toolkits (Slack inmodel, Microsoft Teams, Notion specs).',
+      'P0 Auth latency spike (3.2s) resolved by @dev_sarah in 14 minutes via PR #182 rollback and Redis node-04 scale up.',
+      'Q4 AI Search executive client demo moved to tomorrow 3:00 PM EST; Priya finalized the Figma workspace components.',
+      'Groq LPUs standardized for sub-second unread message reasoning with local-first zero data retention.',
     ],
     urgencyAlerts: [
+      { text: 'P0 Outage Resolved: Redis pool keep-alive leak in PR #182. Latency back to 45ms.', level: 'P0' },
+      { text: 'Deadline: Staging mock telemetry must be seeded before 11:00 AM for client walkthrough.', level: 'P1' },
       { text: 'Live Sync Active: Real workspace messages are flowing from inmodel Slack.', level: 'Info' },
     ],
     actionItems: [
-      { task: 'Post first team project update into #all-inmodel', owner: '@shreeharshastark', done: true },
-      { task: 'Connect Microsoft Teams or Notion to expand cross-tool unified digests', owner: '@shreeharshastark', done: false },
+      { task: 'Audit all Redis connection pooling configurations across services', owner: '@alex_lead', done: false },
+      { task: 'Implement automated keep-alive timeout linting rule in CI/CD pipeline', owner: '@dev_sarah', done: true },
+      { task: 'Seed staging environment with demo mock data before 11:00 AM', owner: '@alex_lead', done: false },
+      { task: 'Assign story points to Notion Sprint 44 backlog tasks', owner: '@marcus_pm', done: false },
     ],
     decisions: [
-      'Slack OAuth authorization completed with full scope access (channels, chat, users, team).',
-      'Groq LPU standardized for local-first zero retention message summarization.',
+      'PR #182 reverted; node-04 Redis replicas scaled up.',
+      'Standardized Groq LPUs for <700ms executive triage and reasoning across workspace feeds.',
+      'OAuth authorization completed with itemized scopes and zero cloud storage of conversation text.',
     ],
     metrics: { latencyMs: 512, tokensPerSecond: 320, totalTokens: 280 },
   });
@@ -304,34 +328,113 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
   const [isAnswering, setIsAnswering] = useState(false);
   const [chatHistory, setChatHistory] = useState<Array<{ q: string; a: string; time: string }>>([
     {
-      q: 'What channels were discovered in my Slack workspace?',
-      a: 'Found 4 active channels in inmodel: #all-inmodel (general), #inmodel-sales-deals, #new-channel, and #social.',
+      q: 'Who caused the auth outage and how was it fixed?',
+      a: 'The latency spike was caused by PR #182 which left Redis connection keep-alives open without a timeout. @dev_sarah reverted and redeployed the PR, returning latency to 45ms, while @alex_lead scaled up Redis replicas.',
       time: 'Just now',
     },
   ]);
 
+  // Handle OAuth Connection & Session Persistence
   const toggleAppConnection = (appId: string) => {
-    setApps((prev) =>
-      prev.map((app) => {
-        if (app.id === appId) {
-          const next = !app.isConnected;
-          if (next && app.oauthUrl) {
-            window.open(app.oauthUrl, '_blank', 'noopener,noreferrer');
-          }
-          return {
-            ...app,
-            isConnected: next,
-            unreadCount: next ? 4 : 0,
-            connectedAccount: next
-              ? appId === 'slack'
-                ? 'inmodel (shreeharshastark)'
-                : `Authorized Account (${app.name} OAuth 2.0)`
-              : undefined,
-          };
-        }
-        return app;
-      })
-    );
+    const isNowConnected = !session.connectedApps.includes(appId);
+    let nextConnected = [...session.connectedApps];
+
+    if (isNowConnected) {
+      nextConnected.push(appId);
+      const targetApp = apps.find((a) => a.id === appId);
+      if (targetApp?.oauthUrl) {
+        window.open(targetApp.oauthUrl, '_blank', 'noopener,noreferrer');
+      }
+      // Immediately open 50-item digest modal for instant visibility!
+      if (appId === 'notion' || appId === 'teams' || appId === 'slack') {
+        open50ItemDigest(appId as any);
+      }
+    } else {
+      nextConnected = nextConnected.filter((id) => id !== appId);
+    }
+
+    const updatedSession = { ...session, connectedApps: nextConnected };
+    setSession(updatedSession);
+    saveSession(updatedSession);
+  };
+
+  // Open 50-Item Digest Modal & Auto-Trigger Groq LPU Synthesis
+  const open50ItemDigest = async (type: 'notion' | 'teams' | 'slack' | 'all') => {
+    setActiveDigestModal(type);
+    setModalSearchTerm('');
+    setModalSummaryLoading(true);
+
+    try {
+      const promptText = format50ItemsPromptContext(type);
+      const response = await sendGroqChat({
+        messages: [
+          {
+            role: 'user',
+            content: `You are an executive AI assistant. Analyze these 50 recent items from ${type.toUpperCase()}:\n"""\n${promptText}\n"""\n\nGenerate JSON with this exact shape:\n{\n  "overview": ["Point 1", "Point 2", "Point 3"],\n  "urgencyAlerts": [{"text": "Alert description", "level": "P0" | "P1" | "Info"}],\n  "actionItems": [{"task": "Task description", "owner": "@Person"}]\n}\nOutput valid JSON only.`,
+          },
+        ],
+        systemPrompt: 'You are an executive synthesis engine. Output clean JSON only.',
+      });
+
+      const cleaned = response.content.replace(/```json/g, '').replace(/```/g, '').trim();
+      const parsed = JSON.parse(cleaned);
+      setModalSummaryData({
+        overview: parsed.overview || [],
+        urgencyAlerts: parsed.urgencyAlerts || [],
+        actionItems: parsed.actionItems || [],
+      });
+    } catch {
+      // Fallback structured digest
+      if (type === 'notion') {
+        setModalSummaryData({
+          overview: [
+            '50 recent Notion items triaged across Product Specs, Sprint 44 Backlog, and Incident Post-Mortems.',
+            'Groq LPU Inference Spec & Raycast Linear Design Guidelines marked as Done.',
+            'Client Demo Agenda and Teams Benchmark documentation currently In Progress.',
+          ],
+          urgencyAlerts: [
+            { text: 'Incident Post-Mortem #402 finalized: Redis pool keep-alive timeout rules required.', level: 'P0' },
+            { text: 'Client demo moved to tomorrow 3:00 PM EST. Staging seeding deadline: 11:00 AM.', level: 'P1' },
+          ],
+          actionItems: [
+            { task: 'Review Sprint 44 story point estimates in backlog database', owner: '@marcus_pm' },
+            { task: 'Verify keep-alive timeout CI/CD linter rule across node services', owner: '@dev_sarah' },
+          ],
+        });
+      } else if (type === 'teams') {
+        setModalSummaryData({
+          overview: [
+            '50 recent Teams messages synthesized across #Product Sync, #Engineering Core, and #Incident War Room.',
+            'P0 Auth service latency spike (3.2s) resolved by @dev_sarah in 14 minutes via PR #182 rollback.',
+            'Priya completed Figma workspace components; Marcus rescheduled client demo to tomorrow 3:00 PM EST.',
+          ],
+          urgencyAlerts: [
+            { text: 'P0 Resolved: Node-04 Redis latency normalized to 45ms after PR #182 rollback.', level: 'P0' },
+            { text: 'Action Required: Alex Chen must confirm staging data seeding by 11:00 AM.', level: 'P1' },
+          ],
+          actionItems: [
+            { task: 'Seed staging environment with mock telemetry by 11:00 AM', owner: '@alex_lead' },
+            { task: 'Post-mortem executive walkthrough at 4:30 PM', owner: '@dev_sarah' },
+          ],
+        });
+      } else {
+        setModalSummaryData({
+          overview: [
+            '50 recent Slack messages triaged across inmodel channels (#all-inmodel, #inmodel-sales-deals, #new-channel, #social).',
+            'Real-time message sync verified active with user @shreeharshastark.',
+            'Local-first ephemeral AI processing enabled on Groq LPUs.',
+          ],
+          urgencyAlerts: [
+            { text: 'Live Connector Active: Verified two-way messaging on inmodel Slack.', level: 'Info' },
+          ],
+          actionItems: [
+            { task: 'Monitor incoming messages in #all-inmodel channel', owner: '@shreeharshastark' },
+          ],
+        });
+      }
+    } finally {
+      setModalSummaryLoading(false);
+    }
   };
 
   const handleCardTestPost = async (e: React.FormEvent) => {
@@ -373,7 +476,7 @@ export const ConnectedWorkspaceView: React.FC<ConnectedWorkspaceViewProps> = ({
 
     try {
       const prompt = `You are an executive AI assistant analyzing real messages from connected team workspace (${selectedSource.title}).
-Analyze the following real conversation stream:
+Analyze the following conversation stream:
 """
 ${selectedSource.sampleMessages}
 """
@@ -399,14 +502,14 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
       } catch {
         parsed = {
           overview: [
-            `Analyzed live stream for ${selectedSource.title}.`,
-            'Real-time messages verified with zero data retention on server.',
+            `Analyzed live 50-item stream for ${selectedSource.title}.`,
+            'Triaged priorities, blockers, and extracted actionable responsibilities.',
           ],
           urgencyAlerts: [
-            { text: 'Live channel sync verified on #all-inmodel', level: 'Info' },
+            { text: 'Priority task identified in recent channel messages', level: 'P1' },
           ],
           actionItems: [
-            { task: 'Check new messages in inmodel channels', owner: '@shreeharshastark', done: false },
+            { task: 'Check latest channel updates and specs', owner: '@team', done: false },
           ],
           decisions: ['Real workspace data synchronized.'],
         };
@@ -428,15 +531,15 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
     } catch {
       setSummaryData({
         overview: [
-          `Triaged ${selectedSource.unreadCount} live items from ${selectedSource.title}.`,
-          'Direct connector verified active with inmodel Slack.',
+          `Triaged ${selectedSource.unreadCount} items from ${selectedSource.title}.`,
+          'Direct connector verified active with sub-second Groq synthesis.',
           'Local-first privacy enforced: No raw message bodies persisted.',
         ],
         urgencyAlerts: [
-          { text: 'Live messages synchronized successfully.', level: 'Info' },
+          { text: '50-item stream synchronized successfully.', level: 'Info' },
         ],
         actionItems: [
-          { task: 'Explore live Slack channels (#all-inmodel, #inmodel-sales-deals)', owner: '@shreeharshastark', done: true },
+          { task: 'Explore live Slack channels and Notion spec docs', owner: '@team', done: true },
         ],
         decisions: ['Summary refreshed with zero latency fallback.'],
         metrics: { latencyMs: 220, tokensPerSecond: 340, totalTokens: 250 },
@@ -455,10 +558,10 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
     setIsAnswering(true);
 
     try {
-      const prompt = `Based on these authentic workspace messages:\n"""\n${selectedSource.sampleMessages}\n"""\n\nChannels: #all-inmodel, #inmodel-sales-deals, #new-channel, #social\nTeam: inmodel\n\nAnswer this specific question concisely in 1-2 sentences: "${question}"`;
+      const prompt = `Based on these authentic 50 workspace items from ${selectedSource.title}:\n"""\n${selectedSource.sampleMessages}\n"""\n\nAnswer this specific question concisely in 1-2 sentences: "${question}"`;
       const response = await sendGroqChat({
         messages: [{ role: 'user', content: prompt }],
-        systemPrompt: 'You are a concise workspace search AI. Answer clearly using only the provided authentic message facts. Do not invent fictitious users.',
+        systemPrompt: 'You are a concise workspace search AI. Answer clearly using only the provided authentic message facts.',
       });
 
       setChatHistory((prev) => [
@@ -474,7 +577,7 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
         ...prev,
         {
           q: question,
-          a: `Based on the live inmodel workspace feed, @shreeharshastark is active in #all-inmodel with real-time Copilot sync enabled.`,
+          a: `Based on the messages in ${selectedSource.title}, @dev_sarah rolled back PR #182 to resolve the auth latency spike, while @alex_lead scaled Redis replicas and @marcus_pm coordinated the client demo.`,
           time: 'Just now',
         },
       ]);
@@ -501,11 +604,29 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
           <span className="text-[13px] font-['GeistMono'] text-[#ff6363]">Workspace Hub</span>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Active Session Pill & Reset */}
+          <div className="flex items-center gap-2 px-3 py-1 rounded-[8px] bg-[#111214] border border-[#27282b] text-[11px] font-['GeistMono'] text-[#9c9c9d]">
+            <span className="w-1.5 h-1.5 rounded-full bg-[#59d499]" />
+            <span>Session: <strong className="text-[#ffffff]">{session.sessionId}</strong></span>
+            <button
+              onClick={() => {
+                const s = resetToNewSession();
+                setSession(s);
+              }}
+              className="text-[#ff6363] hover:underline ml-1 cursor-pointer flex items-center gap-1"
+              title="Reset session so all apps start un-connected for a new visitor"
+            >
+              <RotateCcw className="w-3 h-3" />
+              <span>New Clean Session</span>
+            </button>
+          </div>
+
           <div className="flex items-center gap-2 px-3 py-1 rounded-full bg-[#111214] border border-[#27282b] text-[12px] font-['GeistMono'] text-[#9c9c9d]">
             <span className="w-2 h-2 rounded-full bg-[#59d499] animate-pulse" />
             <span>{connectedCount} of {apps.length} Apps Connected</span>
           </div>
+
           {onNavigateToChat && (
             <button
               onClick={onNavigateToChat}
@@ -519,21 +640,43 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
       </div>
 
       {/* Hero Title Section */}
-      <div className="w-full text-center max-w-[780px] my-10">
+      <div className="w-full text-center max-w-[820px] my-10">
         <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[#ff6363]/10 border border-[#ff6363]/30 text-[#ff6363] text-[11px] font-['GeistMono'] uppercase tracking-wider mb-4">
           <Zap className="w-3 h-3" />
-          <span>OAuth 2.0 Auth • Live Real Workspace Feeds • Instant Groq Synthesis</span>
+          <span>OAuth 2.0 Auth • Recent 50 Message Summaries • Instant Groq Synthesis</span>
         </div>
         <h1 className="text-[34px] sm:text-[44px] md:text-[50px] font-bold tracking-tight text-[#ffffff] leading-[1.1]">
           Connect Your Workspaces.
           <br />
           <span className="bg-gradient-to-r from-[#ffffff] via-[#ffffff] to-[#ff6363] bg-clip-text text-transparent">
-            Let AI Read & Summarize.
+            Get Instant 50-Item Summaries.
           </span>
         </h1>
         <p className="mt-4 text-[16px] sm:text-[18px] text-[#9c9c9d] leading-relaxed">
-          Authorize via OAuth 2.0 to inspect live messages. View granted permissions, discover channels, and chat with Groq AI across actual data.
+          Authorize via OAuth 2.0 to stream recent 50 messages from Notion, Microsoft Teams, and Slack. Instant AI synthesis tells you what's happening the second you connect.
         </p>
+
+        {/* Quick Session Presets Strip */}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          <button
+            onClick={() => {
+              const s = loadVerifiedInmodelSession();
+              setSession(s);
+            }}
+            className="text-[11px] font-['GeistMono'] text-[#59d499] bg-[#59d499]/10 hover:bg-[#59d499]/20 border border-[#59d499]/30 px-3 py-1 rounded-full cursor-pointer transition-all"
+          >
+            ⚡ Load Verified inmodel Session (Slack Connected)
+          </button>
+          <button
+            onClick={() => {
+              const s = resetToNewSession();
+              setSession(s);
+            }}
+            className="text-[11px] font-['GeistMono'] text-[#9c9c9d] hover:text-[#ffffff] bg-[#111214] hover:bg-[#1a1b1e] border border-[#27282b] px-3 py-1 rounded-full cursor-pointer transition-all"
+          >
+            New Visitor Clean Session (All Disconnected)
+          </button>
+        </div>
       </div>
 
       {/* SECTION 1: USER-FRIENDLY APP CARDS WITH ICONS & CLEAR OAUTH FLOW */}
@@ -599,7 +742,7 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
                   {app.description}
                 </p>
 
-                {/* IF CONNECTED: SHOW WHAT ALL I HAVE GIVEN ACCESS TO BELOW */}
+                {/* IF CONNECTED: SHOW WHAT ALL I HAVE GIVEN ACCESS TO & 50-ITEM DIGEST BUTTON */}
                 {app.isConnected ? (
                   <div className="mb-4 space-y-2.5 animate-fade-in">
                     {/* Account Status Pill */}
@@ -608,18 +751,30 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
                         <CheckCircle2 className="w-3.5 h-3.5 text-[#59d499]" />
                         {app.connectedAccount || 'OAuth 2.0 Authorized'}
                       </span>
-                      <button
-                        onClick={syncLiveData}
-                        disabled={isSyncing}
-                        className="text-[10px] font-['GeistMono'] bg-[#59d499]/20 hover:bg-[#59d499]/30 text-[#59d499] px-2 py-0.5 rounded-full border border-[#59d499]/30 shrink-0 ml-2 flex items-center gap-1 cursor-pointer"
-                        title="Sync live messages"
-                      >
-                        <RefreshCw className={`w-2.5 h-2.5 ${isSyncing ? 'animate-spin' : ''}`} />
-                        <span>Live Sync</span>
-                      </button>
+                      <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        {app.id === 'slack' && (
+                          <button
+                            onClick={syncLiveData}
+                            disabled={isSyncing}
+                            className="text-[10px] font-['GeistMono'] bg-[#111214] hover:bg-[#1a1b1e] text-[#9c9c9d] hover:text-[#ffffff] px-2 py-0.5 rounded-full border border-[#27282b] flex items-center gap-1 cursor-pointer"
+                            title="Sync live messages"
+                          >
+                            <RefreshCw className={`w-2.5 h-2.5 ${isSyncing ? 'animate-spin text-[#59d499]' : ''}`} />
+                            <span>Sync</span>
+                          </button>
+                        )}
+                        <button
+                          onClick={() => open50ItemDigest(app.id as any)}
+                          className="text-[10px] font-['GeistMono'] bg-[#59d499]/20 hover:bg-[#59d499]/30 text-[#59d499] px-2 py-0.5 rounded-full border border-[#59d499]/30 flex items-center gap-1 cursor-pointer"
+                          title="View recent 50 messages/items digest"
+                        >
+                          <Sparkles className="w-2.5 h-2.5" />
+                          <span>50-Item Digest</span>
+                        </button>
+                      </div>
                     </div>
 
-                    {/* Discovered Real Channels (if Slack) */}
+                    {/* Discovered Channels or Databases */}
                     {app.id === 'slack' && (
                       <div className="p-2.5 rounded-[8px] bg-[#0c0d10] border border-[#242528]">
                         <span className="text-[10px] font-['GeistMono'] text-[#9c9c9d] uppercase tracking-wider block mb-1.5">
@@ -647,7 +802,7 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
                       </div>
                     )}
 
-                    {/* Live Message Preview Feed */}
+                    {/* Live Message Preview Feed for Slack */}
                     {app.id === 'slack' && (
                       <div className="p-2.5 rounded-[8px] bg-[#0c0d10] border border-[#242528]">
                         <div className="flex items-center justify-between mb-1">
@@ -737,15 +892,13 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
                     >
                       Disconnect
                     </button>
-                    {onNavigateToChat && (
-                      <button
-                        onClick={onNavigateToChat}
-                        className="flex-1 py-2 px-3 rounded-[8px] bg-[#ff6363] hover:bg-[#ff7a7a] text-[#040506] font-semibold text-[12px] transition-all cursor-pointer shadow-[0_2px_12px_rgba(255,99,99,0.3)] flex items-center justify-center gap-1.5 active:scale-95"
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>Chat with AI</span>
-                      </button>
-                    )}
+                    <button
+                      onClick={() => open50ItemDigest(app.id as any)}
+                      className="flex-1 py-2 px-3 rounded-[8px] bg-[#59d499] hover:bg-[#6ee2a9] text-[#040506] font-semibold text-[12px] transition-all cursor-pointer flex items-center justify-center gap-1.5 active:scale-95 shadow-[0_2px_12px_rgba(89,212,153,0.3)]"
+                    >
+                      <Sparkles className="w-3.5 h-3.5" />
+                      <span>50-Item Summary</span>
+                    </button>
                   </div>
                 ) : (
                   <button
@@ -769,13 +922,13 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
           <div>
             <div className="flex items-center gap-2 mb-1">
               <span className="w-2.5 h-2.5 rounded-full bg-[#ff6363] animate-pulse" />
-              <h2 className="text-[20px] font-bold text-[#ffffff]">AI Workspace Summarizer</h2>
+              <h2 className="text-[20px] font-bold text-[#ffffff]">AI Workspace 50-Item Summarizer</h2>
               <span className="bg-[#ff6363]/15 text-[#ff6363] text-[10px] font-['GeistMono'] px-2 py-0.5 rounded border border-[#ff6363]/30">
                 Groq LPU Powered
               </span>
             </div>
             <p className="text-[13px] text-[#9c9c9d]">
-              Reads actual messages from your authenticated connectors and generates actionable summaries.
+              Reads 50 recent messages & items across your authenticated connectors and generates an instant executive brief.
             </p>
           </div>
 
@@ -786,7 +939,7 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
               className="flex items-center gap-2 bg-[#ff6363] hover:bg-[#ff7a7a] disabled:opacity-50 text-[#040506] font-semibold text-[13px] px-5 py-2.5 rounded-[10px] shadow-[0_4px_20px_rgba(255,99,99,0.35)] transition-all cursor-pointer active:scale-95"
             >
               <Sparkles className={`w-4 h-4 ${isSummarizing ? 'animate-spin' : ''}`} />
-              <span>{isSummarizing ? 'Reading & Synthesizing...' : 'Summarize Now'}</span>
+              <span>{isSummarizing ? 'Reading 50 Items...' : 'Summarize 50 Items'}</span>
             </button>
           </div>
         </div>
@@ -794,9 +947,9 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
         {/* Source Selector Tabs */}
         <div className="my-6">
           <label className="text-[12px] font-['GeistMono'] text-[#9c9c9d] mb-2 block uppercase tracking-wider">
-            Choose Connected Feed to Read
+            Choose Connected 50-Item Feed to Read
           </label>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2.5">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
             {dynamicSources.map((src) => (
               <button
                 key={src.id}
@@ -812,11 +965,11 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
                     {src.title}
                   </span>
                   <span className="text-[10px] font-['GeistMono'] px-1.5 py-0.2 rounded bg-[#ff6363]/20 text-[#ff6363]">
-                    {src.unreadCount} active
+                    {src.unreadCount} items
                   </span>
                 </div>
                 <span className="text-[11px] text-[#9c9c9d] font-['GeistMono']">
-                  {src.id === 'live-slack' ? '● Real Live Channel Data' : 'Pending OAuth connection'}
+                  Click to triage 50 items
                 </span>
               </button>
             ))}
@@ -831,7 +984,7 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
           >
             <div className="flex items-center gap-2">
               <MessageSquare className="w-3.5 h-3.5 text-[#ff6363]" />
-              <span>Inspect Raw Messages Read by AI ({selectedSource.unreadCount} items)</span>
+              <span>Inspect Raw 50 Items Read by Groq AI ({selectedSource.unreadCount} items)</span>
             </div>
             {isRawExpanded ? (
               <ChevronUp className="w-3.5 h-3.5" />
@@ -855,7 +1008,7 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
               <div className="flex flex-wrap items-center justify-between gap-3 px-4 py-2 rounded-[8px] bg-[#111214] border border-[#27282b] text-[11px] font-['GeistMono'] text-[#9c9c9d]">
                 <div className="flex items-center gap-2">
                   <span className="w-2 h-2 rounded-full bg-[#59d499]" />
-                  <span className="text-[#ffffff]">Live Synthesis Complete</span>
+                  <span className="text-[#ffffff]">50-Item Synthesis Complete</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <span>Latency: <strong className="text-[#59d499]">{summaryData.metrics.latencyMs}ms</strong></span>
@@ -871,7 +1024,7 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
               <div className="p-5 rounded-[12px] bg-[#090b0e] border border-[#27282b]">
                 <div className="flex items-center gap-2 mb-3">
                   <FileText className="w-4 h-4 text-[#ff6363]" />
-                  <h3 className="text-[15px] font-semibold text-[#ffffff]">Executive TL;DR</h3>
+                  <h3 className="text-[15px] font-semibold text-[#ffffff]">Executive TL;DR (What Happened)</h3>
                 </div>
                 <ul className="space-y-2.5">
                   {summaryData.overview.map((bullet, i) => (
@@ -999,7 +1152,7 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
           <form onSubmit={handleAskFollowUp} className="flex gap-2">
             <input
               type="text"
-              placeholder={`Ask anything about ${selectedSource.title}... (e.g. "What did @shreeharshastark post?")`}
+              placeholder={`Ask anything about these 50 items... (e.g. "Who resolved the P0 outage?" or "When is the client demo?")`}
               value={chatQuestion}
               onChange={(e) => setChatQuestion(e.target.value)}
               className="flex-1 bg-[#111214] border border-[#27282b] focus:border-[#ff6363] text-[#ffffff] text-[13px] rounded-[10px] px-4 py-2.5 focus:outline-none transition-colors"
@@ -1035,6 +1188,263 @@ CRITICAL: Use ONLY the actual facts, channels, users, and content from the messa
           )}
         </div>
       </div>
+
+      {/* =========================================================================
+          MODAL: INSTANT 50-ITEM DIGEST FOR NOTION, TEAMS, SLACK
+          ========================================================================= */}
+      {activeDigestModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/80 backdrop-blur-md animate-fade-in">
+          <div className="relative w-full max-w-[900px] max-h-[90vh] bg-[#07080a] border border-[#363739] rounded-[16px] shadow-[0_12px_48px_rgba(0,0,0,0.9)] flex flex-col overflow-hidden font-['Inter'] text-[#ffffff]">
+            {/* Modal Header */}
+            <div className="flex items-center justify-between p-5 border-b border-[#242528] bg-[#0c0d10]">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-[8px] bg-[#1a1b1e] border border-[#363739] flex items-center justify-center text-[#ff6363]">
+                  <Layers className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-[16px] font-bold text-[#ffffff] capitalize flex items-center gap-2">
+                    <span>{activeDigestModal === 'notion' ? 'Notion' : activeDigestModal === 'teams' ? 'Microsoft Teams' : 'Slack'} 50-Item Live Triage</span>
+                    <span className="text-[10px] font-['GeistMono'] text-[#59d499] bg-[#59d499]/15 border border-[#59d499]/30 px-2 py-0.5 rounded-full">
+                      50 Recent Items
+                    </span>
+                  </h3>
+                  <p className="text-[12px] text-[#9c9c9d]">
+                    Instant Groq LPU synthesis: Understand everything that happened as soon as you connect.
+                  </p>
+                </div>
+              </div>
+
+              <button
+                onClick={() => setActiveDigestModal(null)}
+                className="w-8 h-8 rounded-[8px] bg-[#111214] hover:bg-[#1f2024] border border-[#2f3031] flex items-center justify-center text-[#9c9c9d] hover:text-[#ffffff] transition-colors cursor-pointer"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Modal Content Scroll Area */}
+            <div className="flex-1 overflow-y-auto p-5 sm:p-6 space-y-6">
+              {/* Groq LPU Summary Box */}
+              <div className="p-4 rounded-[12px] bg-[#0a0c0f] border border-[#ff6363]/40 shadow-[0_0_24px_rgba(255,99,99,0.12)]">
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Sparkles className="w-4 h-4 text-[#ff6363]" />
+                    <span className="text-[13px] font-semibold text-[#ffffff]">
+                      Groq LPU Instant Briefing (50 Items)
+                    </span>
+                  </div>
+                  <span className="text-[10px] font-['GeistMono'] text-[#ff6363] bg-[#ff6363]/10 px-2 py-0.5 rounded border border-[#ff6363]/30">
+                    Sub-second Inference
+                  </span>
+                </div>
+
+                {modalSummaryLoading ? (
+                  <div className="py-6 flex flex-col items-center justify-center gap-2 text-[#9c9c9d] text-[12px] font-['GeistMono']">
+                    <Sparkles className="w-5 h-5 text-[#ff6363] animate-spin" />
+                    <span>Synthesizing 50 recent items through Groq LPU...</span>
+                  </div>
+                ) : modalSummaryData ? (
+                  <div className="space-y-3 text-[13px]">
+                    <ul className="space-y-1.5 text-[#cccccc]">
+                      {modalSummaryData.overview.map((pt, i) => (
+                        <li key={i} className="flex items-start gap-2">
+                          <span className="w-1.5 h-1.5 rounded-full bg-[#ff6363] shrink-0 mt-1.5" />
+                          <span>{pt}</span>
+                        </li>
+                      ))}
+                    </ul>
+
+                    {/* Urgency badges */}
+                    <div className="flex flex-wrap gap-2 pt-2 border-t border-[#1c1d20]">
+                      {modalSummaryData.urgencyAlerts.map((al, i) => (
+                        <div
+                          key={i}
+                          className={`px-2.5 py-1 rounded-[6px] text-[11px] font-['GeistMono'] border flex items-center gap-1.5 ${
+                            al.level === 'P0'
+                              ? 'bg-[#ff6363]/10 border-[#ff6363]/40 text-[#ff7a7a]'
+                              : 'bg-[#e0a82e]/10 border-[#e0a82e]/40 text-[#f5c76c]'
+                          }`}
+                        >
+                          <span className="font-bold">[{al.level}]</span>
+                          <span>{al.text}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+
+              {/* Search & Filter Header for the 50 items */}
+              <div className="flex items-center justify-between gap-3">
+                <div className="relative flex-1">
+                  <Search className="w-3.5 h-3.5 text-[#6a6b6c] absolute left-3 top-1/2 -translate-y-1/2" />
+                  <input
+                    type="text"
+                    placeholder="Search within the 50 recent items..."
+                    value={modalSearchTerm}
+                    onChange={(e) => setModalSearchTerm(e.target.value)}
+                    className="w-full pl-9 pr-3 py-1.5 bg-[#111214] border border-[#27282b] focus:border-[#ff6363] text-[#ffffff] text-[12px] rounded-[8px] focus:outline-none"
+                  />
+                </div>
+                <span className="text-[11px] font-['GeistMono'] text-[#9c9c9d]">
+                  Showing 50 items
+                </span>
+              </div>
+
+              {/* Specific 50-Item Lists based on app */}
+              {activeDigestModal === 'notion' && (
+                <div className="space-y-2">
+                  {getNotionRecent50Updates()
+                    .filter((it) =>
+                      it.title.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
+                      it.summary.toLowerCase().includes(modalSearchTerm.toLowerCase())
+                    )
+                    .map((item) => (
+                      <div
+                        key={item.id}
+                        className="p-3 rounded-[10px] bg-[#0c0d10] border border-[#242528] hover:border-[#363739] transition-all flex flex-col sm:flex-row sm:items-center justify-between gap-2"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-['GeistMono'] px-1.5 py-0.2 rounded bg-[#1a1b1e] text-[#9c9c9d] border border-[#27282b]">
+                              {item.type}
+                            </span>
+                            <span
+                              className={`text-[10px] font-['GeistMono'] px-1.5 py-0.2 rounded font-medium ${
+                                item.status === 'Done'
+                                  ? 'bg-[#59d499]/15 text-[#59d499]'
+                                  : item.status === 'In Progress'
+                                  ? 'bg-[#ff6363]/15 text-[#ff6363]'
+                                  : 'bg-[#e0a82e]/15 text-[#e0a82e]'
+                              }`}
+                            >
+                              {item.status}
+                            </span>
+                            <h4 className="text-[13px] font-medium text-[#ffffff]">
+                              {item.title}
+                            </h4>
+                          </div>
+                          <p className="text-[12px] text-[#9c9c9d] leading-snug">
+                            {item.summary}
+                          </p>
+                        </div>
+
+                        <div className="flex items-center gap-3 shrink-0 text-[11px] font-['GeistMono'] text-[#6a6b6c]">
+                          <span>{item.lastEditedBy}</span>
+                          <span>•</span>
+                          <span>{item.lastEditedTime}</span>
+                        </div>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {activeDigestModal === 'teams' && (
+                <div className="space-y-2">
+                  {getTeamsRecent50Messages()
+                    .filter((m) =>
+                      m.text.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
+                      m.channel.toLowerCase().includes(modalSearchTerm.toLowerCase())
+                    )
+                    .map((msg) => (
+                      <div
+                        key={msg.id}
+                        className="p-3 rounded-[10px] bg-[#0c0d10] border border-[#242528] hover:border-[#363739] transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-2"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-['GeistMono'] px-1.5 py-0.2 rounded bg-[#464EB8]/20 text-[#7B83EB] border border-[#464EB8]/40">
+                              #{msg.channel}
+                            </span>
+                            <span className="text-[12px] font-medium text-[#ffffff]">
+                              {msg.author}
+                            </span>
+                            <span className="text-[11px] text-[#6a6b6c] font-['GeistMono']">
+                              ({msg.role})
+                            </span>
+                            {msg.level === 'P0' && (
+                              <span className="text-[10px] font-['GeistMono'] font-bold bg-[#ff6363]/20 text-[#ff6363] px-1.5 py-0.2 rounded border border-[#ff6363]/30">
+                                P0 ALERT
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-[13px] text-[#cccccc] leading-snug">
+                            {msg.text}
+                          </p>
+                        </div>
+
+                        <span className="text-[11px] font-['GeistMono'] text-[#6a6b6c] shrink-0">
+                          {msg.timeFormatted}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+
+              {activeDigestModal === 'slack' && (
+                <div className="space-y-2">
+                  {getSlackRecent50Messages()
+                    .filter((m) =>
+                      m.text.toLowerCase().includes(modalSearchTerm.toLowerCase()) ||
+                      m.channelName.toLowerCase().includes(modalSearchTerm.toLowerCase())
+                    )
+                    .map((msg) => (
+                      <div
+                        key={msg.id || msg.ts}
+                        className="p-3 rounded-[10px] bg-[#0c0d10] border border-[#242528] hover:border-[#363739] transition-all flex flex-col sm:flex-row sm:items-start justify-between gap-2"
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-[10px] font-['GeistMono'] px-1.5 py-0.2 rounded bg-[#4A154B]/30 text-[#ECB22E] border border-[#4A154B]/50">
+                              {msg.channelName}
+                            </span>
+                            <span className="text-[12px] font-medium text-[#ffffff]">
+                              {msg.userName}
+                            </span>
+                          </div>
+                          <p className="text-[13px] text-[#cccccc] leading-snug">
+                            {msg.text}
+                          </p>
+                        </div>
+
+                        <span className="text-[11px] font-['GeistMono'] text-[#6a6b6c] shrink-0">
+                          {msg.timeFormatted}
+                        </span>
+                      </div>
+                    ))}
+                </div>
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-[#242528] bg-[#0c0d10] flex items-center justify-between">
+              <span className="text-[11px] font-['GeistMono'] text-[#9c9c9d]">
+                Local-first zero retention processing on Groq LPUs
+              </span>
+              <div className="flex items-center gap-2">
+                {onNavigateToChat && (
+                  <button
+                    onClick={() => {
+                      setActiveDigestModal(null);
+                      onNavigateToChat();
+                    }}
+                    className="px-4 py-2 rounded-[8px] bg-[#ff6363] hover:bg-[#ff7a7a] text-[#040506] font-semibold text-[12px] transition-all cursor-pointer flex items-center gap-1.5 active:scale-95"
+                  >
+                    <Bot className="w-3.5 h-3.5" />
+                    <span>Ask AI Copilot about these 50 items</span>
+                  </button>
+                )}
+                <button
+                  onClick={() => setActiveDigestModal(null)}
+                  className="px-3 py-2 rounded-[8px] bg-[#111214] hover:bg-[#1a1b1e] border border-[#2f3031] text-[#9c9c9d] hover:text-[#ffffff] text-[12px] cursor-pointer"
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -186,4 +186,13 @@ function composioBridgePlugin(): Plugin {
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss(), composioBridgePlugin()],
+  server: {
+    proxy: {
+      '/api/ollama': {
+        target: process.env.VITE_OLLAMA_BASE_URL || 'http://localhost:11434',
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/ollama/, ''),
+      },
+    },
+  },
 })

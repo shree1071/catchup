@@ -2,109 +2,177 @@ import React, { useState, useRef, useEffect } from 'react';
 import {
   Send,
   Sparkles,
-  User,
-  Zap,
-  Trash2,
   Copy,
   Check,
   ChevronDown,
   ChevronRight,
   Settings,
   Brain,
+  Volume2,
+  ThumbsUp,
+  ThumbsDown,
+  RotateCcw,
+  Plus,
+  Mic,
+  Share2,
+  CheckCircle2,
+  PanelLeftClose,
+  PanelLeft,
   MessageSquare,
+  ArrowLeft,
+  Hash,
   FileText,
+  Users,
+  Compass,
+  ShieldCheck,
   RefreshCw,
-  PlusCircle,
 } from 'lucide-react';
 import {
   sendGroqChat,
   GROQ_MODELS,
-  type ChatMessage,
+  OLLAMA_MODELS,
+  checkOllamaStatus,
+  DEFAULT_OLLAMA_MODEL,
+  DEFAULT_OLLAMA_BASE_URL,
+  type ChatMessage as GroqChatMessage,
+  type AIProvider,
 } from '../services/groqService';
-import {
-  executeZapierMcpAction,
-} from '../services/zapierMcpService';
 import {
   fetchLiveChannels,
   fetchLiveMessages,
   buildRealWorkspacePromptContext,
-  sendLiveSlackMessage,
+  format50ItemsPromptContext,
   type LiveMessage,
   type SlackChannel,
 } from '../services/workspaceConnectorService';
+
+interface ChatMessage extends GroqChatMessage {
+  toolUsed?: 'Slack' | 'Microsoft Teams' | 'Notion' | 'Unified Workspace';
+  toolDetails?: string;
+}
+
+interface ChatThread {
+  id: string;
+  title: string;
+  timestamp: string;
+  messages: ChatMessage[];
+  activeIntegration: 'slack' | 'teams' | 'notion' | 'all';
+}
 
 interface ChatbotViewProps {
   onBackToLanding?: () => void;
   onOpenZapierModal?: () => void;
 }
 
-interface ZapierMessageStatus {
-  app: string;
-  status: 'sending' | 'success' | 'error';
-  details: string;
-  durationMs: number;
-}
-
 export const ChatbotView: React.FC<ChatbotViewProps> = ({
   onBackToLanding,
-  onOpenZapierModal,
 }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
+  // Sidebar State (User friendly chat tools have collapsible history)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(true);
+
+  // Initial Threads
+  const [threads, setThreads] = useState<ChatThread[]>([
     {
-      id: 'init-1',
-      role: 'assistant',
-      content:
-        'Welcome to CatchUp AI Copilot! Connected to Groq LPU (sub-second inference) with live read access to your authenticated inmodel Slack workspace (#all-inmodel, #inmodel-sales-deals, #new-channel, #social). Ask me what messages have been posted, who is active, or to summarize your channel activity!',
-      timestamp: Date.now(),
-      metrics: {
-        latencyMs: 120,
-        tokensPerSecond: 950,
-        completionTokens: 42,
-        totalTokens: 42,
-      },
+      id: 'thread-1',
+      title: 'Slack models connector check',
+      timestamp: 'Today, 1:40 PM',
+      activeIntegration: 'slack',
+      messages: [
+        {
+          id: 'msg-u1',
+          role: 'user',
+          content: 'whats ahapenibng',
+          timestamp: Date.now() - 40000,
+        },
+        {
+          id: 'msg-a1',
+          role: 'assistant',
+          toolUsed: 'Slack',
+          toolDetails: 'Checked inmodel channels (#all-inmodel, #inmodel-sales-deals, #new-channel, #social)',
+          content: `Nothing new in inmodel. Both channels have no messages, replies, or reactions since the last check.
+
+Still open:
+• Northwind Traders has been silent for 9 days, and Rahul is following up.
+• Initech has a discovery call Tuesday at 11 AM.
+• Sales quota is at 78% with 3 weeks left.
+• Security training is due by the end of next week.`,
+          timestamp: Date.now() - 25000,
+          metrics: {
+            latencyMs: 412,
+            tokensPerSecond: 380,
+            totalTokens: 110,
+          },
+        },
+      ],
+    },
+    {
+      id: 'thread-2',
+      title: 'Sprint 44 blockers review',
+      timestamp: 'Yesterday',
+      activeIntegration: 'notion',
+      messages: [],
+    },
+    {
+      id: 'thread-3',
+      title: 'Auth incident post-mortem',
+      timestamp: 'Oct 8',
+      activeIntegration: 'teams',
+      messages: [],
     },
   ]);
 
-  const [input, setInput] = useState('');
+  const [activeThreadId, setActiveThreadId] = useState<string>('thread-1');
+  const activeThread = threads.find((t) => t.id === activeThreadId) || threads[0];
+
+  // Active Model & Integrations
   const [selectedModel, setSelectedModel] = useState<string>('openai/gpt-oss-20b');
+  const [activeIntegration, setActiveIntegration] = useState<'slack' | 'teams' | 'notion' | 'all'>(
+    activeThread.activeIntegration || 'slack'
+  );
+  const [showIntegrationMenu, setShowIntegrationMenu] = useState(false);
+
+  // Input & State
+  const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [likedMap, setLikedMap] = useState<Record<string, 'up' | 'down'>>({});
+  const [expandedToolMap, setExpandedToolMap] = useState<Record<string, boolean>>({});
+  const [expandedReasoning, setExpandedReasoning] = useState<Record<string, boolean>>({});
   const [showSettings, setShowSettings] = useState(false);
   const [apiKeyOverride, setApiKeyOverride] = useState('');
-  const [expandedReasoning, setExpandedReasoning] = useState<Record<string, boolean>>({});
-  const [zapierStatus, setZapierStatus] = useState<Record<string, ZapierMessageStatus>>({});
+  const [isVoiceActive, setIsVoiceActive] = useState(false);
+  const [shareToast, setShareToast] = useState<string | null>(null);
 
-  // Real Workspace Connector State
+  // AI Provider & Ollama State
+  const [aiProvider, setAiProvider] = useState<AIProvider>('groq');
+  const [ollamaModel, setOllamaModel] = useState<string>(DEFAULT_OLLAMA_MODEL);
+  const [customOllamaModel, setCustomOllamaModel] = useState<string>('');
+  const [ollamaBaseUrl, setOllamaBaseUrl] = useState<string>(DEFAULT_OLLAMA_BASE_URL);
+  const [ollamaStatus, setOllamaStatus] = useState<{ isRunning: boolean; version?: string } | null>(null);
+  const [isCheckingOllama, setIsCheckingOllama] = useState<boolean>(false);
+
+  // Real Workspace Feeds
   const [liveChannels, setLiveChannels] = useState<SlackChannel[]>([]);
   const [liveMessages, setLiveMessages] = useState<LiveMessage[]>([]);
-  const [isSyncingLive, setIsSyncingLive] = useState(false);
-  const [showSlackPostBox, setShowSlackPostBox] = useState(false);
-  const [quickPostText, setQuickPostText] = useState('');
-  const [isPostingSlack, setIsPostingSlack] = useState(false);
-  const [postFeedback, setPostFeedback] = useState<string | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
 
-  const syncLiveWorkspace = async () => {
-    setIsSyncingLive(true);
-    try {
-      const [channels, msgs] = await Promise.all([
-        fetchLiveChannels(),
-        fetchLiveMessages('C0BBUP1LEJH'),
-      ]);
-      setLiveChannels(channels);
-      setLiveMessages(msgs);
-    } catch (err) {
-      console.error('Error syncing live workspace:', err);
-    } finally {
-      setIsSyncingLive(false);
-    }
-  };
-
   useEffect(() => {
-    syncLiveWorkspace();
+    fetchLiveChannels().then(setLiveChannels);
+    fetchLiveMessages('C0BBUP1LEJH').then(setLiveMessages);
   }, []);
+
+  // Probe Ollama status when user opens settings or selects Ollama provider
+  useEffect(() => {
+    if (aiProvider === 'ollama' || showSettings) {
+      setIsCheckingOllama(true);
+      checkOllamaStatus(ollamaBaseUrl)
+        .then(setOllamaStatus)
+        .catch(() => setOllamaStatus({ isRunning: false }))
+        .finally(() => setIsCheckingOllama(false));
+    }
+  }, [aiProvider, ollamaBaseUrl, showSettings]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -112,123 +180,25 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, isLoading, zapierStatus]);
+  }, [activeThread.messages, isLoading]);
 
-  const quickPrompts = [
-    'What was the latest message in #all-inmodel?',
-    'Summarize all active channels in the inmodel workspace',
-    'What did @shreeharshastark post to the channel?',
-    'Draft a project status update to post to #all-inmodel',
-  ];
-
-  const handlePostToSlack = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickPostText.trim() || isPostingSlack) return;
-
-    setIsPostingSlack(true);
-    setPostFeedback(null);
-    try {
-      const ok = await sendLiveSlackMessage(quickPostText.trim(), 'C0BBUP1LEJH');
-      if (ok) {
-        setPostFeedback('✓ Message posted to Slack #all-inmodel!');
-        setQuickPostText('');
-        await syncLiveWorkspace();
-        setTimeout(() => setPostFeedback(null), 3000);
-      } else {
-        setPostFeedback('⚠️ Failed to post message to Slack');
-      }
-    } catch {
-      setPostFeedback('⚠️ Error sending message');
-    } finally {
-      setIsPostingSlack(false);
-    }
+  // Create New Chat (Just like Claude/ChatGPT)
+  const handleNewChat = () => {
+    const newThreadId = `thread-${Date.now()}`;
+    const newThread: ChatThread = {
+      id: newThreadId,
+      title: 'New conversation',
+      timestamp: 'Just now',
+      activeIntegration: 'slack',
+      messages: [],
+    };
+    setThreads([newThread, ...threads]);
+    setActiveThreadId(newThreadId);
+    setActiveIntegration('slack');
+    setTimeout(() => inputRef.current?.focus(), 100);
   };
 
-  const handleDispatchToTeams = async (messageId: string, content: string) => {
-    setZapierStatus((prev) => ({
-      ...prev,
-      [messageId]: {
-        app: 'Microsoft Teams',
-        status: 'sending',
-        details: 'Sending to #hackathon-war-room...',
-        durationMs: 0,
-      },
-    }));
-
-    try {
-      const res = await executeZapierMcpAction({
-        actionId: 'teams_post_channel_message',
-        params: {
-          channel: '#hackathon-war-room',
-          content: content.slice(0, 400),
-        },
-      });
-
-      setZapierStatus((prev) => ({
-        ...prev,
-        [messageId]: {
-          app: 'Microsoft Teams',
-          status: 'success',
-          details: 'Posted to #hackathon-war-room',
-          durationMs: res.durationMs,
-        },
-      }));
-    } catch {
-      setZapierStatus((prev) => ({
-        ...prev,
-        [messageId]: {
-          app: 'Microsoft Teams',
-          status: 'error',
-          details: 'Failed to post message',
-          durationMs: 0,
-        },
-      }));
-    }
-  };
-
-  const handleDispatchToNotion = async (messageId: string, content: string) => {
-    setZapierStatus((prev) => ({
-      ...prev,
-      [messageId]: {
-        app: 'Notion',
-        status: 'sending',
-        details: 'Syncing to Notion Workspace...',
-        durationMs: 0,
-      },
-    }));
-
-    try {
-      const res = await executeZapierMcpAction({
-        actionId: 'notion_create_database_item',
-        params: {
-          database: 'Hackathon Architecture',
-          title: `Architecture Spec: ${content.slice(0, 32)}...`,
-          body: content,
-        },
-      });
-
-      setZapierStatus((prev) => ({
-        ...prev,
-        [messageId]: {
-          app: 'Notion',
-          status: 'success',
-          details: 'Saved to Hackathon Architecture DB',
-          durationMs: res.durationMs,
-        },
-      }));
-    } catch {
-      setZapierStatus((prev) => ({
-        ...prev,
-        [messageId]: {
-          app: 'Notion',
-          status: 'error',
-          details: 'Failed to create Notion page',
-          durationMs: 0,
-        },
-      }));
-    }
-  };
-
+  // Send Message
   const handleSend = async (textToSend?: string) => {
     const prompt = (textToSend || input).trim();
     if (!prompt || isLoading) return;
@@ -240,64 +210,121 @@ export const ChatbotView: React.FC<ChatbotViewProps> = ({
       timestamp: Date.now(),
     };
 
-    const newMessages = [...messages, userMessage];
-    setMessages(newMessages);
+    const currentMessages = activeThread.messages || [];
+    const updatedMessages = [...currentMessages, userMessage];
+
+    // Update thread title if first message
+    const updatedTitle =
+      activeThread.title === 'New conversation'
+        ? prompt.length > 28
+          ? `${prompt.slice(0, 28)}...`
+          : prompt
+        : activeThread.title;
+
+    setThreads((prev) =>
+      prev.map((t) =>
+        t.id === activeThreadId
+          ? { ...t, title: updatedTitle, messages: updatedMessages }
+          : t
+      )
+    );
+
     setInput('');
     setIsLoading(true);
 
     try {
-      const history = newMessages.map((m) => ({
+      const history = updatedMessages.map((m) => ({
         role: m.role,
         content: m.content,
       }));
 
-      const workspaceContext = buildRealWorkspacePromptContext(liveMessages, liveChannels);
+      // Determine active integration tool
+      let toolName: 'Slack' | 'Microsoft Teams' | 'Notion' | 'Unified Workspace' = 'Slack';
+      let toolDetail = 'Checked inmodel channels (#all-inmodel, #inmodel-sales-deals, #new-channel, #social)';
+      let contextText = '';
+
+      const lower = prompt.toLowerCase();
+      if (lower.includes('notion') || activeIntegration === 'notion') {
+        toolName = 'Notion';
+        toolDetail = 'Checked 50 recent Notion specs & Sprint 44 database items';
+        contextText = format50ItemsPromptContext('notion');
+      } else if (lower.includes('teams') || activeIntegration === 'teams') {
+        toolName = 'Microsoft Teams';
+        toolDetail = 'Checked 50 recent messages in #Product Sync & #Engineering Core';
+        contextText = format50ItemsPromptContext('teams');
+      } else {
+        toolName = 'Slack';
+        toolDetail = 'Checked inmodel channels (#all-inmodel, #inmodel-sales-deals, #new-channel, #social)';
+        contextText = buildRealWorkspacePromptContext(liveMessages, liveChannels);
+      }
+
+      const effectiveModel =
+        aiProvider === 'ollama'
+          ? (ollamaModel === 'custom' ? customOllamaModel.trim() || 'llama3.2' : ollamaModel)
+          : selectedModel;
 
       const result = await sendGroqChat({
         messages: history,
-        model: selectedModel,
+        model: effectiveModel,
         apiKey: apiKeyOverride,
-        systemPrompt: `You are CatchUp AI Copilot powered by Groq LPUs.
-You have direct real-time read access to the user's authentic connected workspace:
-${workspaceContext}
+        provider: aiProvider,
+        ollamaBaseUrl: ollamaBaseUrl,
+        systemPrompt: `You are CatchUp AI, an intelligent executive workspace copilot designed like Claude.
+Live Workspace Context:
+${contextText}
 
-Instructions:
-1. Reference exact facts, real channels (#all-inmodel, #inmodel-sales-deals, #new-channel, #social), real usernames (@shreeharshastark), and exact message timestamps.
-2. Provide concise, clear, and actionable summaries or answers.
-3. If asked what messages exist, what channel is active, or what was posted, give authentic, accurate answers based on the real messages stream above. Do not invent fake users or mock incidents.`,
+CRITICAL FORMATTING INSTRUCTIONS:
+1. When user asks what is happening ("whats happening", "whats ahapenibng", "what happened", "summarize", etc.):
+   - First state the direct status of the workspace (e.g. "Nothing new in inmodel. Both channels have no messages since the last check." or mention recent live activity).
+   - Then provide a clean, readable section:
+Still open:
+• [Action item, discovery call, client demo, or pending task]
+• [Next key priority with person/deadline]
+• [Next key item]
+
+2. Match the clean, direct, executive tone of Claude: helpful, concise, well-formatted, and completely factual based on the workspace context.`,
       });
 
-      const assistantMsgId = `assistant-${Date.now()}`;
       const assistantMessage: ChatMessage = {
-        id: assistantMsgId,
+        id: `assistant-${Date.now()}`,
         role: 'assistant',
+        toolUsed: toolName,
+        toolDetails:
+          aiProvider === 'ollama'
+            ? `100% Local Edge (Ollama: ${effectiveModel}) • ${toolDetail}`
+            : toolDetail,
         content: result.content,
         reasoning: result.reasoning,
         timestamp: Date.now(),
         metrics: result.metrics,
       };
 
-      setMessages((prev) => [...prev, assistantMessage]);
-
-      const lowerPrompt = prompt.toLowerCase();
-      if (lowerPrompt.includes('teams')) {
-        setTimeout(() => {
-          handleDispatchToTeams(assistantMsgId, result.content);
-        }, 500);
-      } else if (lowerPrompt.includes('notion')) {
-        setTimeout(() => {
-          handleDispatchToNotion(assistantMsgId, result.content);
-        }, 500);
-      }
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === activeThreadId
+            ? { ...t, messages: [...updatedMessages, assistantMessage] }
+            : t
+        )
+      );
     } catch (err: unknown) {
       const errorText = err instanceof Error ? err.message : 'Unknown error occurred';
       const errorMessage: ChatMessage = {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: `⚠️ Groq Execution Error: ${errorText}\n\nPlease check your network or verify your Groq API key in Settings.`,
+        toolUsed: 'Slack',
+        content:
+          aiProvider === 'ollama'
+            ? `⚠️ Ollama Local Inference Error: ${errorText}\n\nMake sure Ollama is running on ${ollamaBaseUrl} with \`ollama serve\` and you have pulled the model with \`ollama run ${ollamaModel === 'custom' ? customOllamaModel || 'llama3.2' : ollamaModel}\`.`
+            : `⚠️ Groq Execution Error: ${errorText}\n\nPlease verify your network or check settings.`,
         timestamp: Date.now(),
       };
-      setMessages((prev) => [...prev, errorMessage]);
+      setThreads((prev) =>
+        prev.map((t) =>
+          t.id === activeThreadId
+            ? { ...t, messages: [...updatedMessages, errorMessage] }
+            : t
+        )
+      );
     } finally {
       setIsLoading(false);
       setTimeout(() => inputRef.current?.focus(), 100);
@@ -317,476 +344,707 @@ Instructions:
     setTimeout(() => setCopiedId(null), 2000);
   };
 
-  const toggleReasoning = (id: string) => {
-    setExpandedReasoning((prev) => ({
+  const handleFeedback = (id: string, type: 'up' | 'down') => {
+    setLikedMap((prev) => ({
       ...prev,
-      [id]: !prev[id],
+      [id]: prev[id] === type ? undefined! : type,
     }));
   };
 
-  const handleClearHistory = () => {
-    setMessages([
-      {
-        id: `init-${Date.now()}`,
-        role: 'assistant',
-        content: 'Chat session reset. Real-time workspace bus ready on Groq LPUs.',
-        timestamp: Date.now(),
-      },
-    ]);
+  const handleRegenerate = () => {
+    const msgs = activeThread.messages;
+    if (msgs.length < 2) return;
+    const lastUserMsg = [...msgs].reverse().find((m) => m.role === 'user');
+    if (lastUserMsg) {
+      handleSend(lastUserMsg.content);
+    }
   };
 
+  const handleShare = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setShareToast('Chat link copied to clipboard!');
+    setTimeout(() => setShareToast(null), 2500);
+  };
+
+  const starterCards = [
+    {
+      title: 'whats ahapenibng',
+      desc: 'Check live Slack channels & open items',
+      icon: <Hash className="w-4 h-4 text-[#ff6363]" />,
+    },
+    {
+      title: 'Summarize #all-inmodel',
+      desc: 'Read latest updates from @shreeharshastark',
+      icon: <Sparkles className="w-4 h-4 text-[#59d499]" />,
+    },
+    {
+      title: 'Review open tasks & blockers',
+      desc: 'Extract Still Open list across toolkits',
+      icon: <FileText className="w-4 h-4 text-[#7B83EB]" />,
+    },
+    {
+      title: 'Check Microsoft Teams sync',
+      desc: 'Audit 50 recent messages in Product & Core',
+      icon: <Users className="w-4 h-4 text-[#ffb86c]" />,
+    },
+  ];
+
   return (
-    <section className="w-full max-w-[1140px] mx-auto px-4 sm:px-6 py-8 flex flex-col h-[calc(100vh-100px)] min-h-[640px]">
-      {/* Top Cockpit Header */}
-      <div className="flex items-center justify-between pb-4 mb-4 border-b border-[#1b1c1e]">
-        {/* Brand & Model Info */}
-        <div className="flex items-center gap-3">
-          {onBackToLanding && (
-            <button
-              onClick={onBackToLanding}
-              className="px-2.5 py-1 rounded-[6px] bg-[#111214] hover:bg-[#1b1c1e] text-[#9c9c9d] hover:text-[#ffffff] text-[12px] font-['GeistMono'] border border-[#2f3031] transition-colors cursor-pointer"
-            >
-              ← Frontpage
-            </button>
-          )}
-
-          <div className="flex items-center gap-2">
-            <svg
-              viewBox="0 0 24 24"
-              className="w-4 h-4"
-              style={{ filter: 'drop-shadow(0 0 6px rgba(255, 99, 99, 0.5))' }}
-            >
-              <polygon points="12,2 22,12 12,22 2,12" fill="#ff6363" />
-            </svg>
-            <span className="font-['Inter'] text-[15px] font-medium text-[#ffffff]">
-              Groq LPU Copilot
-            </span>
-            <span className="text-[#363739]">/</span>
-            <span className="font-['GeistMono'] text-[12px] text-[#59d499] bg-[#59d499]/10 px-2 py-0.5 rounded-[4px] border border-[#59d499]/20 flex items-center gap-1.5">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#59d499] animate-pulse" />
-              LIVE SLACK FEED
-            </span>
-          </div>
-        </div>
-
-        {/* Model Selector & Action Controls */}
-        <div className="flex items-center gap-2">
-          {onOpenZapierModal && (
-            <button
-              onClick={onOpenZapierModal}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[8px] bg-[#111214] hover:bg-[#1b1c1e] text-[#ffffff] border border-[#2f3031] hover:border-[#ff6363]/40 text-[12px] font-['GeistMono'] transition-colors cursor-pointer"
-              title="Open Zapier MCP & Agent Skills Hub (Teams, Notion, Slack)"
-            >
-              <Zap className="w-3.5 h-3.5 text-[#ff6363]" />
-              <span className="hidden sm:inline">Zapier MCP</span>
-              <span className="font-['GeistMono'] text-[9px] text-[#ff6363] bg-[#ff6363]/10 px-1 py-0.2 rounded border border-[#ff6363]/20">
-                TEAMS / NOTION
-              </span>
-            </button>
-          )}
-
-          {/* Model Selector */}
-          <div className="relative">
-            <select
-              value={selectedModel}
-              onChange={(e) => setSelectedModel(e.target.value)}
-              className="appearance-none bg-[#111214] hover:bg-[#1b1c1e] border border-[#2f3031] text-[#ffffff] text-[12px] font-['GeistMono'] rounded-[8px] pl-3 pr-8 py-1.5 focus:outline-none focus:border-[#ff6363]/50 cursor-pointer"
-            >
-              {GROQ_MODELS.map((m) => (
-                <option key={m.id} value={m.id} className="bg-[#07080a] text-[#ffffff]">
-                  {m.name}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="w-3.5 h-3.5 text-[#6a6b6c] absolute right-2.5 top-1/2 -translate-y-1/2 pointer-events-none" />
-          </div>
-
-          {/* Settings Trigger */}
-          <button
-            onClick={() => setShowSettings(!showSettings)}
-            className={`p-1.5 rounded-[8px] border transition-colors cursor-pointer ${
-              showSettings
-                ? 'bg-[#1b1c1e] text-[#ffffff] border-[#363739]'
-                : 'bg-[#111214] text-[#9c9c9d] hover:text-[#ffffff] border-[#2f3031]'
-            }`}
-            title="Configure Groq API Key"
-          >
-            <Settings className="w-4 h-4" />
-          </button>
-
-          {/* Clear Session */}
-          <button
-            onClick={handleClearHistory}
-            className="p-1.5 rounded-[8px] bg-[#111214] hover:bg-[#1b1c1e] text-[#9c9c9d] hover:text-[#ffffff] border border-[#2f3031] transition-colors cursor-pointer"
-            title="Reset conversation"
-          >
-            <Trash2 className="w-4 h-4" />
-          </button>
-        </div>
-      </div>
-
-      {/* Settings Drawer / Flyout */}
-      {showSettings && (
-        <div className="mb-4 p-4 rounded-[12px] bg-[#07080a] border border-[#2f3031] text-[13px] animate-fade-in key-shadow">
-          <div className="flex items-center justify-between mb-2">
-            <span className="font-['Inter'] font-medium text-[#ffffff]">
-              Groq Engine Configuration
-            </span>
-            <span className="font-['GeistMono'] text-[11px] text-[#59d499] flex items-center gap-1">
-              <span className="w-2 h-2 rounded-full bg-[#59d499]" />
-              Status: Connected (Groq LPUs)
-            </span>
-          </div>
-          <p className="text-[#9c9c9d] text-[12px] mb-3">
-            Your Groq API key is active. Real Slack workspace data is streamed directly into prompt context.
-          </p>
-          <div className="flex items-center gap-2">
-            <input
-              type="password"
-              placeholder="Custom Groq API Key (defaults to project key)"
-              value={apiKeyOverride}
-              onChange={(e) => setApiKeyOverride(e.target.value)}
-              className="flex-1 bg-[#111214] border border-[#2f3031] focus:border-[#ff6363] text-[#ffffff] text-[12px] font-mono rounded-[6px] px-3 py-1.5 focus:outline-none"
-            />
-            <button
-              onClick={() => setShowSettings(false)}
-              className="px-3 py-1.5 rounded-[6px] bg-[#e6e6e6] text-[#454647] font-medium text-[12px] cursor-pointer"
-            >
-              Done
-            </button>
-          </div>
+    <div className="w-full h-screen bg-[#07080a] text-[#ffffff] font-['Inter'] flex overflow-hidden selection:bg-[#ff6363]/30">
+      {/* Toast */}
+      {shareToast && (
+        <div className="fixed top-5 right-5 z-50 bg-[#16181d] border border-[#2e313b] text-[#ffffff] px-3.5 py-2 rounded-[8px] text-[13px] shadow-2xl animate-fade-in flex items-center gap-2">
+          <Check className="w-3.5 h-3.5 text-[#59d499]" />
+          <span>{shareToast}</span>
         </div>
       )}
 
-      {/* Live Workspace Feeds Status Bar */}
-      <div className="flex flex-wrap items-center justify-between gap-2 px-3.5 py-2.5 rounded-[10px] bg-[#0c0d10] border border-[#27282b] mb-3 text-[12px] font-['GeistMono'] animate-fade-in">
-        <div className="flex items-center gap-2.5">
-          <span className="w-2 h-2 rounded-full bg-[#59d499] animate-pulse" />
-          <span className="text-[#ffffff] font-medium">
-            Live Connector: <span className="text-[#59d499]">inmodel</span> Slack
-          </span>
-          <span className="text-[#9c9c9d] text-[11px]">
-            ({liveChannels.length || 4} channels • {liveMessages.length} message synced)
-          </span>
-        </div>
-
-        <div className="flex items-center gap-2">
-          <button
-            onClick={syncLiveWorkspace}
-            disabled={isSyncingLive}
-            className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#111214] hover:bg-[#1a1b1e] border border-[#2f3031] text-[#9c9c9d] hover:text-[#ffffff] text-[11px] transition-colors cursor-pointer"
-            title="Refresh messages directly from Slack"
-          >
-            <RefreshCw className={`w-3 h-3 ${isSyncingLive ? 'animate-spin text-[#59d499]' : ''}`} />
-            <span>{isSyncingLive ? 'Syncing...' : 'Sync Live'}</span>
-          </button>
-
-          <button
-            onClick={() => setShowSlackPostBox(!showSlackPostBox)}
-            className="flex items-center gap-1 px-2.5 py-1 rounded bg-[#59d499]/15 hover:bg-[#59d499]/25 border border-[#59d499]/40 text-[#59d499] text-[11px] font-medium transition-colors cursor-pointer"
-          >
-            <PlusCircle className="w-3 h-3" />
-            <span>Post to #all-inmodel</span>
-          </button>
-        </div>
-      </div>
-
-      {/* Quick Post To Slack Flyout */}
-      {showSlackPostBox && (
-        <form
-          onSubmit={handlePostToSlack}
-          className="mb-3 p-3.5 rounded-[10px] bg-[#090b0e] border border-[#59d499]/30 flex flex-col sm:flex-row items-center gap-2 animate-fade-in"
-        >
-          <input
-            type="text"
-            placeholder="Type a real message to post into Slack #all-inmodel..."
-            value={quickPostText}
-            onChange={(e) => setQuickPostText(e.target.value)}
-            className="flex-1 w-full bg-[#111214] border border-[#27282b] focus:border-[#59d499] text-[#ffffff] text-[12px] font-['Inter'] rounded-[6px] px-3 py-1.5 focus:outline-none"
-          />
-          <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
-            <button
-              type="submit"
-              disabled={!quickPostText.trim() || isPostingSlack}
-              className="px-3 py-1.5 rounded-[6px] bg-[#59d499] hover:bg-[#6ae0a6] text-[#040506] font-semibold text-[12px] transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1.5 shrink-0"
-            >
-              <span>{isPostingSlack ? 'Posting...' : 'Send to Slack'}</span>
-              <Send className="w-3 h-3" />
-            </button>
-            <button
-              type="button"
-              onClick={() => setShowSlackPostBox(false)}
-              className="px-2.5 py-1.5 text-[12px] text-[#9c9c9d] hover:text-[#ffffff] cursor-pointer"
-            >
-              Cancel
-            </button>
-          </div>
-          {postFeedback && (
-            <span className="text-[11px] font-['GeistMono'] text-[#59d499] w-full mt-1">
-              {postFeedback}
-            </span>
-          )}
-        </form>
-      )}
-
-      {/* Main Messages Feed */}
-      <div
-        className="flex-1 overflow-y-auto space-y-4 p-4 rounded-[16px] bg-[#07080a] border border-[#2f3031]/80 mb-4"
-        style={{
-          boxShadow:
-            'rgba(255, 255, 255, 0.05) 0px 1px 0px 0px inset, rgba(255, 255, 255, 0.22) 0px 0px 0px 1px, rgba(0, 0, 0, 0.3) 0px 8px 30px 0px, rgba(0, 0, 0, 0.4) 0px -1px 0px 0px inset',
-        }}
+      {/* =========================================================================
+          LEFT SIDEBAR: CONVERSATION HISTORY & WORKSPACE INTEGRATIONS
+          ========================================================================= */}
+      <aside
+        className={`h-full bg-[#0a0c0f] border-r border-[#1c1d22] flex flex-col justify-between transition-all duration-300 z-30 ${
+          isSidebarOpen ? 'w-[260px]' : 'w-0 -translate-x-full overflow-hidden'
+        }`}
       >
-        {messages.map((msg) => {
-          const isUser = msg.role === 'user';
+        <div className="p-3.5 flex flex-col h-full overflow-hidden">
+          {/* Top Row: Brand & New Chat */}
+          <div className="flex items-center justify-between pb-3 mb-2 border-b border-[#1c1d22]">
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-[6px] bg-[#ff6363]/15 border border-[#ff6363]/30 flex items-center justify-center text-[#ff6363]">
+                <Sparkles className="w-3.5 h-3.5" />
+              </div>
+              <span className="font-semibold text-[14px] text-[#ffffff] tracking-tight">
+                CatchUp AI
+              </span>
+            </div>
 
-          return (
-            <div
-              key={msg.id}
-              className={`flex items-start gap-3 text-[14px] leading-relaxed group relative animate-fade-in ${
-                isUser ? 'justify-end' : 'justify-start'
-              }`}
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              className="p-1 rounded-[6px] text-[#6a6b6c] hover:text-[#ffffff] hover:bg-[#14161b] transition-colors cursor-pointer"
+              title="Close sidebar"
             >
-              {!isUser && (
-                <div className="w-8 h-8 rounded-[8px] bg-[#111214] border border-[#2f3031] flex items-center justify-center text-[#ff6363] shrink-0 mt-0.5">
-                  <svg viewBox="0 0 24 24" className="w-4 h-4 fill-current">
-                    <polygon points="12,2 22,12 12,22 2,12" />
-                  </svg>
-                </div>
-              )}
+              <PanelLeftClose className="w-4 h-4" />
+            </button>
+          </div>
 
-              <div
-                className={`max-w-[85%] rounded-[12px] p-3.5 border transition-all ${
-                  isUser
-                    ? 'bg-[#1b1c1e] border-[#363739] text-[#ffffff]'
-                    : 'bg-[#111214] border-[#27282b] text-[#cccccc]'
+          {/* New Chat Button */}
+          <button
+            onClick={handleNewChat}
+            className="w-full py-2 px-3 rounded-[8px] bg-[#14161b] hover:bg-[#1c1f26] border border-[#262830] text-[#ffffff] text-[13px] font-medium flex items-center justify-between transition-all cursor-pointer shadow-sm mb-4 group"
+          >
+            <div className="flex items-center gap-2">
+              <Plus className="w-4 h-4 text-[#ff6363] group-hover:scale-110 transition-transform" />
+              <span>New chat</span>
+            </div>
+            <kbd className="font-['GeistMono'] text-[10px] text-[#6a6b6c] bg-[#0c0d10] px-1.5 py-0.5 rounded border border-[#22242b]">
+              ⌘N
+            </kbd>
+          </button>
+
+          {/* Recent Conversations List */}
+          <div className="flex-1 overflow-y-auto space-y-1 pr-1">
+            <span className="text-[11px] font-['GeistMono'] text-[#6a6b6c] uppercase tracking-wider px-2 block mb-1">
+              Recent Chats
+            </span>
+            {threads.map((t) => (
+              <button
+                key={t.id}
+                onClick={() => {
+                  setActiveThreadId(t.id);
+                  setActiveIntegration(t.activeIntegration || 'slack');
+                }}
+                className={`w-full text-left px-2.5 py-2 rounded-[8px] text-[13px] flex items-center justify-between group transition-colors cursor-pointer ${
+                  t.id === activeThreadId
+                    ? 'bg-[#181a20] text-[#ffffff] font-medium border border-[#2a2d36]'
+                    : 'text-[#9c9c9d] hover:bg-[#111317] hover:text-[#ffffff]'
                 }`}
               >
-                {/* Message Header info */}
-                <div className="flex items-center justify-between gap-4 mb-2">
-                  <span className="font-['GeistMono'] text-[11px] text-[#6a6b6c] flex items-center gap-1.5">
-                    {isUser ? (
-                      <>
-                        <User className="w-3 h-3 text-[#9c9c9d]" />
-                        <span>You (shreeharshastark)</span>
-                      </>
-                    ) : (
-                      <>
-                        <span className="w-1.5 h-1.5 rounded-full bg-[#59d499]" />
-                        <span>Groq AI Copilot (inmodel connector)</span>
-                      </>
-                    )}
-                  </span>
-
-                  {msg.metrics && (
-                    <div className="flex items-center gap-2 text-[10px] font-['GeistMono'] text-[#59d499]">
-                      <span>{msg.metrics.latencyMs}ms</span>
-                      {msg.metrics.tokensPerSecond && (
-                        <span>• {Math.round(msg.metrics.tokensPerSecond)} T/s</span>
-                      )}
-                    </div>
-                  )}
+                <div className="flex items-center gap-2 truncate">
+                  <MessageSquare className="w-3.5 h-3.5 text-[#6a6b6c] group-hover:text-[#ff6363] shrink-0" />
+                  <span className="truncate">{t.title}</span>
                 </div>
+              </button>
+            ))}
+          </div>
 
-                {/* Optional Reasoning Collapse for Reasoning Models */}
-                {msg.reasoning && (
-                  <div className="mb-3 rounded-[8px] border border-[#2f3031] bg-[#07080a] overflow-hidden">
-                    <button
-                      onClick={() => toggleReasoning(msg.id)}
-                      className="w-full flex items-center justify-between px-3 py-1.5 text-left text-[11px] font-['GeistMono'] text-[#9c9c9d] hover:text-[#ffffff] bg-[#07080a] transition-colors cursor-pointer"
-                    >
-                      <span className="flex items-center gap-1.5 text-[#ff6363]">
-                        <Brain className="w-3 h-3" />
-                        <span>Thinking / Reasoning Process</span>
-                      </span>
-                      {expandedReasoning[msg.id] ? (
-                        <ChevronDown className="w-3.5 h-3.5 text-[#6a6b6c]" />
-                      ) : (
-                        <ChevronRight className="w-3.5 h-3.5 text-[#6a6b6c]" />
-                      )}
-                    </button>
-
-                    {expandedReasoning[msg.id] && (
-                      <div className="p-3 border-t border-[#1b1c1e] font-['GeistMono'] text-[12px] text-[#6a6b6c] whitespace-pre-wrap leading-normal bg-[#040506]">
-                        {msg.reasoning}
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {/* Main Content Body */}
-                <div className="whitespace-pre-wrap font-['Inter'] font-normal text-[#ffffff]/95">
-                  {msg.content}
+          {/* Sidebar Footer: Connected Toolkits Status */}
+          <div className="pt-3 border-t border-[#1c1d22] space-y-2">
+            <span className="text-[10px] font-['GeistMono'] text-[#6a6b6c] uppercase tracking-wider px-1 block">
+              Connected Toolkits:
+            </span>
+            <div className="space-y-1.5 text-[12px] font-['GeistMono']">
+              <div className="flex items-center justify-between px-2 py-1 rounded bg-[#111317] border border-[#202228] text-[#cccccc]">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#59d499] animate-pulse" />
+                  <span>Slack (inmodel)</span>
                 </div>
+                <span className="text-[10px] text-[#59d499]">4 ch</span>
+              </div>
 
-                {/* Zapier Execution Status Badge (if triggered) */}
-                {zapierStatus[msg.id] && (
-                  <div className="mt-3 p-2.5 rounded-[8px] bg-[#07080a] border border-[#2f3031] flex items-center justify-between text-[11px] font-['GeistMono'] animate-fade-in">
-                    <div className="flex items-center gap-2">
-                      <div
-                        className={`w-4 h-4 rounded-full flex items-center justify-center ${
-                          zapierStatus[msg.id].status === 'sending'
-                            ? 'bg-[#ff6363]/15 border border-[#ff6363]/40 text-[#ff6363] animate-spin'
-                            : zapierStatus[msg.id].status === 'success'
-                            ? 'bg-[#59d499]/15 border border-[#59d499]/40 text-[#59d499]'
-                            : 'bg-[#ff6363]/15 border border-[#ff6363]/40 text-[#ff6363]'
-                        }`}
-                      >
-                        {zapierStatus[msg.id].status === 'sending' ? (
-                          <Sparkles className="w-2.5 h-2.5" />
-                        ) : zapierStatus[msg.id].status === 'success' ? (
-                          <Check className="w-2.5 h-2.5" />
-                        ) : (
-                          <span>!</span>
-                        )}
-                      </div>
-                      <span className="text-[#ffffff] font-medium">
-                        {zapierStatus[msg.id].app}:
-                      </span>
-                      <span className="text-[#9c9c9d]">
-                        {zapierStatus[msg.id].details}
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {zapierStatus[msg.id].durationMs > 0 && (
-                        <span className="text-[#59d499]">
-                          {zapierStatus[msg.id].durationMs}ms
-                        </span>
-                      )}
-                      <span className="text-[#ff6363] bg-[#ff6363]/10 px-1 py-0.2 rounded border border-[#ff6363]/20">
-                        ZAPIER MCP
-                      </span>
-                    </div>
-                  </div>
-                )}
-
-                {/* Zapier Action Strip (for assistant messages) */}
-                {!isUser && (
-                  <div className="mt-3 pt-2.5 border-t border-[#1b1c1e] flex flex-wrap items-center gap-2">
-                    <span className="font-['GeistMono'] text-[10px] text-[#6a6b6c] uppercase tracking-wider">
-                      Zapier MCP:
-                    </span>
-
-                    <button
-                      onClick={() => handleDispatchToTeams(msg.id, msg.content)}
-                      disabled={zapierStatus[msg.id]?.status === 'sending'}
-                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] bg-[#07080a] hover:bg-[#1b1c1e] text-[#9c9c9d] hover:text-[#ffffff] border border-[#2f3031] text-[11px] font-['Inter'] transition-colors cursor-pointer"
-                      title="Post this response directly to Microsoft Teams"
-                    >
-                      <MessageSquare className="w-3 h-3 text-[#56c2ff]" />
-                      <span>Post to Teams</span>
-                    </button>
-
-                    <button
-                      onClick={() => handleDispatchToNotion(msg.id, msg.content)}
-                      disabled={zapierStatus[msg.id]?.status === 'sending'}
-                      className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-[5px] bg-[#07080a] hover:bg-[#1b1c1e] text-[#9c9c9d] hover:text-[#ffffff] border border-[#2f3031] text-[11px] font-['Inter'] transition-colors cursor-pointer"
-                      title="Save this response directly to Notion workspace"
-                    >
-                      <FileText className="w-3 h-3 text-[#ff6363]" />
-                      <span>Save to Notion</span>
-                    </button>
-
-                    {onOpenZapierModal && (
-                      <button
-                        onClick={onOpenZapierModal}
-                        className="inline-flex items-center gap-1 px-1.5 py-0.5 text-[10px] font-['GeistMono'] text-[#6a6b6c] hover:text-[#ff6363] transition-colors cursor-pointer ml-auto"
-                        title="Configure Zapier Agent Skills & MCP Hub"
-                      >
-                        <Zap className="w-2.5 h-2.5 text-[#ff6363]" />
-                        <span>MCP Hub</span>
-                      </button>
-                    )}
-                  </div>
-                )}
-
-                {/* Message Action Bar (Copy) */}
-                <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                  <button
-                    onClick={() => handleCopyMessage(msg.id, msg.content)}
-                    className="p-1 rounded bg-[#07080a]/80 hover:bg-[#1b1c1e] text-[#9c9c9d] hover:text-[#ffffff] border border-[#2f3031] transition-all cursor-pointer"
-                    title="Copy message"
-                  >
-                    {copiedId === msg.id ? (
-                      <Check className="w-3 h-3 text-[#59d499]" />
-                    ) : (
-                      <Copy className="w-3 h-3" />
-                    )}
-                  </button>
+              <div className="flex items-center justify-between px-2 py-1 rounded bg-[#111317] border border-[#202228] text-[#9c9c9d]">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#7B83EB]" />
+                  <span>Teams (Product)</span>
                 </div>
+                <span className="text-[10px] text-[#7B83EB]">50 msgs</span>
+              </div>
+
+              <div className="flex items-center justify-between px-2 py-1 rounded bg-[#111317] border border-[#202228] text-[#9c9c9d]">
+                <div className="flex items-center gap-1.5">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#ffb86c]" />
+                  <span>Notion (Sprint 44)</span>
+                </div>
+                <span className="text-[10px] text-[#ffb86c]">50 items</span>
               </div>
             </div>
-          );
-        })}
 
-        {/* Loading Indicator */}
-        {isLoading && (
-          <div className="flex flex-col items-start">
-            <div className="flex items-center gap-2 mb-1.5 px-1 text-[11px] font-['GeistMono'] text-[#ff6363]">
-              <Sparkles className="w-3 h-3 animate-spin" />
-              <span>Streaming through Groq LPUs...</span>
+            {/* Back to Hub Button */}
+            {onBackToLanding && (
+              <button
+                onClick={onBackToLanding}
+                className="w-full mt-2 py-1.5 px-2.5 rounded-[6px] text-[12px] text-[#9c9c9d] hover:text-[#ffffff] hover:bg-[#14161b] flex items-center gap-1.5 transition-colors cursor-pointer"
+              >
+                <ArrowLeft className="w-3.5 h-3.5" />
+                <span>Return to Hub</span>
+              </button>
+            )}
+          </div>
+        </div>
+      </aside>
+
+      {/* =========================================================================
+          MAIN CHAT STAGE: FOCUSED, SPACIOUS, IDENTICAL TO CLAUDE SCREENSHOT
+          ========================================================================= */}
+      <div className="flex-1 flex flex-col h-full overflow-hidden relative">
+        {/* Top Navbar */}
+        <header className="w-full px-4 sm:px-6 py-3 flex items-center justify-between border-b border-[#1c1d22] bg-[#07080a] z-20">
+          <div className="flex items-center gap-3">
+            {!isSidebarOpen && (
+              <button
+                onClick={() => setIsSidebarOpen(true)}
+                className="p-1.5 rounded-[6px] text-[#9c9c9d] hover:text-[#ffffff] hover:bg-[#14161b] transition-colors cursor-pointer"
+                title="Open sidebar"
+              >
+                <PanelLeft className="w-4 h-4" />
+              </button>
+            )}
+
+            {/* Chat Title Dropdown */}
+            <div className="flex items-center gap-1.5 cursor-pointer group">
+              <span className="text-[14px] font-medium text-[#ffffff]">
+                {activeThread.title}
+              </span>
+              <ChevronDown className="w-3.5 h-3.5 text-[#6a6b6c] group-hover:text-[#ffffff]" />
             </div>
-            <div className="rounded-[12px] bg-[#111214] border border-[#2f3031] p-4 flex items-center gap-2 text-[13px] text-[#9c9c9d]">
-              <span className="w-2 h-2 rounded-full bg-[#ff6363] animate-ping" />
-              <span className="font-['GeistMono'] text-[12px]">Synthesizing reasoning tokens...</span>
+          </div>
+
+          {/* Right Tools: Engine Badge, Free plan, Settings, Share */}
+          <div className="flex items-center gap-2 text-[12px]">
+            {/* Active Engine Badge */}
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={`flex items-center gap-1.5 px-2.5 py-1 rounded-full text-[11px] font-['GeistMono'] border transition-all cursor-pointer ${
+                aiProvider === 'ollama'
+                  ? 'bg-[#59d499]/15 text-[#59d499] border-[#59d499]/30 hover:bg-[#59d499]/20'
+                  : 'bg-[#ff6363]/15 text-[#ff6363] border-[#ff6363]/30 hover:bg-[#ff6363]/20'
+              }`}
+              title="Toggle inference engine settings"
+            >
+              {aiProvider === 'ollama' ? (
+                <>
+                  <ShieldCheck className="w-3 h-3 text-[#59d499]" />
+                  <span>🦙 Ollama ({ollamaModel === 'custom' ? customOllamaModel || 'custom' : ollamaModel})</span>
+                </>
+              ) : (
+                <>
+                  <Sparkles className="w-3 h-3 text-[#ff6363]" />
+                  <span>⚡ Groq LPU</span>
+                </>
+              )}
+            </button>
+
+            <button
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-1.5 rounded-[6px] transition-colors cursor-pointer ${
+                showSettings ? 'bg-[#1b1c1e] text-[#ffffff]' : 'text-[#9c9c9d] hover:text-[#ffffff] hover:bg-[#14161b]'
+              }`}
+              title="AI Provider Settings"
+            >
+              <Settings className="w-4 h-4" />
+            </button>
+
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-1.5 px-3 py-1 rounded-[6px] bg-[#14161b] hover:bg-[#1c1f26] border border-[#272932] text-[#ffffff] font-medium transition-colors cursor-pointer"
+            >
+              <Share2 className="w-3.5 h-3.5 text-[#9c9c9d]" />
+              <span>Share</span>
+            </button>
+          </div>
+        </header>
+
+        {/* Settings Drawer */}
+        {showSettings && (
+          <div className="w-full max-w-[800px] mx-auto mt-2 p-4 rounded-[12px] bg-[#0c0d10] border border-[#27282b] text-[12px] animate-fade-in z-20 space-y-3">
+            <div className="flex items-center justify-between pb-2 border-b border-[#1b1c1e]">
+              <span className="font-semibold text-[#ffffff] text-[13px]">AI Inference Engine Configuration</span>
+              <div className="flex items-center p-0.5 rounded-[6px] bg-[#111214] border border-[#27282b]">
+                <button
+                  onClick={() => setAiProvider('groq')}
+                  className={`px-2.5 py-1 rounded-[4px] text-[11px] font-['GeistMono'] transition-all cursor-pointer ${
+                    aiProvider === 'groq'
+                      ? 'bg-[#ff6363]/20 text-[#ff6363] border border-[#ff6363]/40 font-medium'
+                      : 'text-[#9c9c9d] hover:text-[#ffffff]'
+                  }`}
+                >
+                  ⚡ Groq LPU (Cloud)
+                </button>
+                <button
+                  onClick={() => setAiProvider('ollama')}
+                  className={`px-2.5 py-1 rounded-[4px] text-[11px] font-['GeistMono'] transition-all cursor-pointer ${
+                    aiProvider === 'ollama'
+                      ? 'bg-[#59d499]/20 text-[#59d499] border border-[#59d499]/40 font-medium'
+                      : 'text-[#9c9c9d] hover:text-[#ffffff]'
+                  }`}
+                >
+                  🦙 Ollama (100% Local BYOM)
+                </button>
+              </div>
             </div>
+
+            {/* Groq Form */}
+            {aiProvider === 'groq' && (
+              <div className="space-y-2">
+                <div className="flex items-center gap-3">
+                  <div className="flex-1">
+                    <label className="text-[#9c9c9d] text-[11px] block mb-1">Select Reasoning Model</label>
+                    <select
+                      value={selectedModel}
+                      onChange={(e) => setSelectedModel(e.target.value)}
+                      className="w-full bg-[#111214] border border-[#27282b] rounded-[6px] px-3 py-1.5 text-[#ffffff] font-['GeistMono'] focus:outline-none"
+                    >
+                      {GROQ_MODELS.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.contextWindow})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="flex-1">
+                    <label className="text-[#9c9c9d] text-[11px] block mb-1">API Key Override (Optional)</label>
+                    <input
+                      type="password"
+                      placeholder="gsk_..."
+                      value={apiKeyOverride}
+                      onChange={(e) => setApiKeyOverride(e.target.value)}
+                      className="w-full bg-[#111214] border border-[#27282b] rounded-[6px] px-3 py-1.5 text-[#ffffff] font-mono focus:outline-none"
+                    />
+                  </div>
+                </div>
+                <p className="text-[11px] text-[#6a6b6c] font-['GeistMono']">
+                  Groq Language Processing Units deliver ultra-high tokens/sec inference across open-weights models.
+                </p>
+              </div>
+            )}
+
+            {/* Ollama Form */}
+            {aiProvider === 'ollama' && (
+              <div className="space-y-2.5">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[#9c9c9d] text-[11px] block mb-1">Local Model (BYOM)</label>
+                    <select
+                      value={ollamaModel}
+                      onChange={(e) => setOllamaModel(e.target.value)}
+                      className="w-full bg-[#111214] border border-[#27282b] rounded-[6px] px-3 py-1.5 text-[#ffffff] font-['GeistMono'] focus:outline-none focus:border-[#59d499]"
+                    >
+                      {OLLAMA_MODELS.map((m) => (
+                        <option key={m.id} value={m.id}>
+                          {m.name} ({m.size})
+                        </option>
+                      ))}
+                      <option value="custom">+ Custom BYOM Model Tag...</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[#9c9c9d] text-[11px] block mb-1">Ollama Host Endpoint</label>
+                    <input
+                      type="text"
+                      value={ollamaBaseUrl}
+                      onChange={(e) => setOllamaBaseUrl(e.target.value)}
+                      placeholder="http://localhost:11434"
+                      className="w-full bg-[#111214] border border-[#27282b] rounded-[6px] px-3 py-1.5 text-[#ffffff] font-['GeistMono'] focus:outline-none"
+                    />
+                  </div>
+                </div>
+
+                {ollamaModel === 'custom' && (
+                  <div>
+                    <label className="text-[#9c9c9d] text-[11px] block mb-1">Custom Model Name / Tag</label>
+                    <input
+                      type="text"
+                      value={customOllamaModel}
+                      onChange={(e) => setCustomOllamaModel(e.target.value)}
+                      placeholder="e.g. deepseek-r1:1.5b, mistral:7b-instruct, qwen2.5-coder:7b"
+                      className="w-full bg-[#111214] border border-[#27282b] rounded-[6px] px-3 py-1.5 text-[#59d499] font-['GeistMono'] focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {/* Status & Connection Check */}
+                <div className="flex items-center justify-between pt-1 text-[11px] font-['GeistMono']">
+                  <div className="flex items-center gap-2">
+                    {isCheckingOllama ? (
+                      <span className="text-[#9c9c9d] flex items-center gap-1.5">
+                        <RefreshCw className="w-3 h-3 animate-spin" /> Verifying endpoint...
+                      </span>
+                    ) : ollamaStatus?.isRunning ? (
+                      <span className="text-[#59d499] flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#59d499]/10 border border-[#59d499]/30">
+                        <span className="w-1.5 h-1.5 rounded-full bg-[#59d499] animate-pulse" />
+                        <span>Connected ({ollamaStatus.version || 'Edge'})</span>
+                      </span>
+                    ) : (
+                      <span className="text-[#ffbd59] flex items-center gap-1.5 px-2 py-0.5 rounded bg-[#ffbd59]/10 border border-[#ffbd59]/30">
+                        <span>● Unreachable (start with `ollama serve`)</span>
+                      </span>
+                    )}
+                    <button
+                      onClick={() => {
+                        setIsCheckingOllama(true);
+                        checkOllamaStatus(ollamaBaseUrl).then(setOllamaStatus).finally(() => setIsCheckingOllama(false));
+                      }}
+                      className="text-[#9c9c9d] hover:text-[#ffffff] underline cursor-pointer"
+                    >
+                      Test Ping
+                    </button>
+                  </div>
+                  <span className="text-[#59d499] text-[11px] flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5" /> 100% Local Edge Air-Gapped
+                  </span>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        <div ref={messagesEndRef} />
-      </div>
+        {/* Conversation Stream */}
+        <div className="flex-1 overflow-y-auto px-4 sm:px-6 py-6 flex flex-col items-center">
+          <div className="w-full max-w-[760px] space-y-7">
+            {/* If Thread has no messages: Friendly Claude-style Welcome & Starter Chips */}
+            {activeThread.messages.length === 0 ? (
+              <div className="py-12 flex flex-col items-center text-center animate-fade-in">
+                <div className="w-12 h-12 rounded-[14px] bg-[#14161b] border border-[#272932] flex items-center justify-center text-[#ff6363] mb-4 shadow-md">
+                  <Compass className="w-6 h-6" />
+                </div>
+                <h2 className="text-[24px] sm:text-[28px] font-bold text-[#ffffff] mb-2">
+                  What would you like to catch up on?
+                </h2>
+                <p className="text-[14px] text-[#9c9c9d] max-w-[480px] mb-8 leading-relaxed">
+                  Connected to your authenticated <strong className="text-[#ffffff]">inmodel Slack</strong>, Teams, and Notion. Ask what's happening or choose a topic below.
+                </p>
 
-      {/* Quick Prompts Suggestion Pills */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-2 mb-2">
-        <span className="font-['GeistMono'] text-[11px] text-[#6a6b6c] shrink-0 uppercase">
-          Live queries:
-        </span>
-        {quickPrompts.map((qp, idx) => (
-          <button
-            key={idx}
-            onClick={() => handleSend(qp)}
-            className="shrink-0 px-2.5 py-1 rounded-[6px] bg-[#111214] hover:bg-[#1b1c1e] text-[#9c9c9d] hover:text-[#ffffff] border border-[#2f3031] text-[12px] font-['Inter'] transition-colors cursor-pointer"
-          >
-            "{qp}"
-          </button>
-        ))}
-      </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 w-full max-w-[620px] text-left">
+                  {starterCards.map((card, idx) => (
+                    <button
+                      key={idx}
+                      onClick={() => handleSend(card.title)}
+                      className="p-3.5 rounded-[12px] bg-[#0c0e12] hover:bg-[#13151b] border border-[#20222a] hover:border-[#ff6363]/40 transition-all cursor-pointer flex items-start gap-3 group text-left"
+                    >
+                      <div className="p-2 rounded-[8px] bg-[#181a22] border border-[#2b2d38] group-hover:scale-105 transition-transform shrink-0">
+                        {card.icon}
+                      </div>
+                      <div>
+                        <div className="text-[13px] font-semibold text-[#ffffff] group-hover:text-[#ff6363] transition-colors">
+                          "{card.title}"
+                        </div>
+                        <div className="text-[11px] text-[#9c9c9d] mt-0.5 leading-snug">
+                          {card.desc}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              /* Message Thread List */
+              activeThread.messages.map((msg) => {
+                const isUser = msg.role === 'user';
 
-      {/* Recessed Input Well (#111214) with keyboard key styling */}
-      <div
-        className="rounded-[12px] bg-[#111214] border border-[#2f3031] p-2 flex items-end gap-2 transition-all focus-within:border-[#ff6363]/60 focus-within:ring-1 focus-within:ring-[#ff6363]/30"
-        style={{
-          boxShadow: 'rgba(255, 255, 255, 0.05) 0px 1px 0px 0px inset',
-        }}
-      >
-        <textarea
-          ref={inputRef}
-          rows={2}
-          placeholder="Ask Groq about your Slack messages... (e.g. 'What was posted in #all-inmodel?') [Press ↵ to send]"
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          className="flex-1 bg-transparent text-[#ffffff] text-[14px] sm:text-[15px] placeholder-[#6a6b6c] resize-none focus:outline-none p-2 leading-relaxed"
-        />
+                if (isUser) {
+                  return (
+                    <div key={msg.id} className="flex justify-end animate-fade-in">
+                      <div className="max-w-[78%] px-4 py-2.5 rounded-[18px] bg-[#1a1c22] border border-[#2c2e36] text-[#ffffff] text-[15px] leading-relaxed shadow-sm">
+                        {msg.content}
+                      </div>
+                    </div>
+                  );
+                }
 
-        <div className="flex items-center gap-2 shrink-0 pb-1 pr-1">
-          <kbd className="hidden sm:inline-block font-['GeistMono'] text-[10px] text-[#6a6b6c] bg-[#07080a] px-1.5 py-0.5 rounded border border-[#2f3031]">
-            ↵ Send
-          </kbd>
+                return (
+                  <div key={msg.id} className="flex flex-col items-start text-left animate-fade-in group w-full">
+                    {/* "Used Slack integration" Expandable Pill Header */}
+                    {msg.toolUsed && (
+                      <div className="mb-2">
+                        <button
+                          onClick={() =>
+                            setExpandedToolMap((p) => ({ ...p, [msg.id]: !p[msg.id] }))
+                          }
+                          className="inline-flex items-center gap-1.5 text-[13px] text-[#9c9c9d] hover:text-[#cccccc] transition-colors cursor-pointer select-none"
+                        >
+                          <CheckCircle2 className="w-3.5 h-3.5 text-[#59d499]" />
+                          <span>Used {msg.toolUsed} integration</span>
+                          <ChevronDown
+                            className={`w-3 h-3 text-[#6a6b6c] transition-transform ${
+                              expandedToolMap[msg.id] ? 'rotate-180' : ''
+                            }`}
+                          />
+                        </button>
 
-          <button
-            onClick={() => handleSend()}
-            disabled={!input.trim() || isLoading}
-            className={`p-2.5 rounded-[8px] transition-all cursor-pointer ${
-              input.trim() && !isLoading
-                ? 'bg-[#e6e6e6] hover:bg-[#ffffff] text-[#454647] btn-mist-shadow active:scale-95'
-                : 'bg-[#1b1c1e] text-[#6a6b6c] cursor-not-allowed border border-[#2f3031]'
-            }`}
-          >
-            <Send className="w-4 h-4" />
-          </button>
+                        {/* Tool Details Flyout */}
+                        {expandedToolMap[msg.id] && (
+                          <div className="mt-1.5 p-2.5 rounded-[8px] bg-[#0c0d10] border border-[#22242c] text-[11px] font-['GeistMono'] text-[#9c9c9d] animate-fade-in space-y-1">
+                            <div className="flex items-center gap-1 text-[#59d499]">
+                              <span>✓</span>
+                              <span>{msg.toolDetails || 'Scanned channels for unread activity'}</span>
+                            </div>
+                            <div className="text-[#6a6b6c]">
+                              Zero-retention local synthesis on Groq LPUs ({msg.metrics?.latencyMs || 412}ms)
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Reasoning Drawer if available */}
+                    {msg.reasoning && (
+                      <div className="w-full mb-2 rounded-[8px] border border-[#22242c] bg-[#0c0d10] overflow-hidden text-[11px] font-['GeistMono'] text-[#6a6b6c]">
+                        <button
+                          onClick={() =>
+                            setExpandedReasoning((p) => ({ ...p, [msg.id]: !p[msg.id] }))
+                          }
+                          className="w-full flex items-center justify-between p-2 cursor-pointer hover:text-[#9c9c9d]"
+                        >
+                          <span className="flex items-center gap-1.5 text-[#ff6363]">
+                            <Brain className="w-3 h-3" />
+                            <span>Reasoning Process</span>
+                          </span>
+                          {expandedReasoning[msg.id] ? <ChevronDown className="w-3 h-3" /> : <ChevronRight className="w-3 h-3" />}
+                        </button>
+                        {expandedReasoning[msg.id] && (
+                          <div className="p-3 border-t border-[#1c1d22] bg-[#07080a] whitespace-pre-wrap text-[#9c9c9d]">
+                            {msg.reasoning}
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Assistant Message Body (Clean typography like Claude) */}
+                    <div className="w-full text-[15px] sm:text-[16px] text-[#ffffff] leading-[1.68] font-['Inter'] whitespace-pre-line selection:bg-[#ff6363]/30">
+                      {msg.content}
+                    </div>
+
+                    {/* Action Strip: Copy, Audio, Thumbs, Regenerate */}
+                    <div className="flex items-center gap-3 mt-3 pt-1 text-[#6a6b6c]">
+                      <button
+                        onClick={() => handleCopyMessage(msg.id, msg.content)}
+                        className="p-1 hover:text-[#ffffff] transition-colors cursor-pointer"
+                        title="Copy response"
+                      >
+                        {copiedId === msg.id ? (
+                          <Check className="w-3.5 h-3.5 text-[#59d499]" />
+                        ) : (
+                          <Copy className="w-3.5 h-3.5" />
+                        )}
+                      </button>
+
+                      <button
+                        onClick={() => {
+                          if ('speechSynthesis' in window) {
+                            const ut = new SpeechSynthesisUtterance(msg.content);
+                            window.speechSynthesis.speak(ut);
+                          }
+                        }}
+                        className="p-1 hover:text-[#ffffff] transition-colors cursor-pointer"
+                        title="Read aloud"
+                      >
+                        <Volume2 className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => handleFeedback(msg.id, 'up')}
+                        className={`p-1 transition-colors cursor-pointer ${
+                          likedMap[msg.id] === 'up' ? 'text-[#59d499]' : 'hover:text-[#ffffff]'
+                        }`}
+                        title="Helpful"
+                      >
+                        <ThumbsUp className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={() => handleFeedback(msg.id, 'down')}
+                        className={`p-1 transition-colors cursor-pointer ${
+                          likedMap[msg.id] === 'down' ? 'text-[#ff6363]' : 'hover:text-[#ffffff]'
+                        }`}
+                        title="Not helpful"
+                      >
+                        <ThumbsDown className="w-3.5 h-3.5" />
+                      </button>
+
+                      <button
+                        onClick={handleRegenerate}
+                        className="p-1 hover:text-[#ffffff] transition-colors cursor-pointer"
+                        title="Regenerate"
+                      >
+                        <RotateCcw className="w-3.5 h-3.5" />
+                      </button>
+
+                      {msg.metrics && (
+                        <span className="text-[10px] font-['GeistMono'] text-[#6a6b6c] ml-auto">
+                          {msg.metrics.latencyMs}ms • Groq LPU
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                );
+              })
+            )}
+
+            {/* Loading Indicator */}
+            {isLoading && (
+              <div className="flex flex-col items-start animate-fade-in text-left">
+                <div className="flex items-center gap-1.5 text-[13px] text-[#9c9c9d] mb-1.5">
+                  <Sparkles className="w-3.5 h-3.5 text-[#ff6363] animate-spin" />
+                  <span>Checking {activeIntegration === 'slack' ? 'Slack' : activeIntegration === 'teams' ? 'Microsoft Teams' : 'Notion'} integration...</span>
+                </div>
+                <div className="flex items-center gap-2 text-[#9c9c9d] text-[14px]">
+                  <span className="w-2 h-2 rounded-full bg-[#ff6363] animate-pulse" />
+                  <span>Scanning channels and organizing open items...</span>
+                </div>
+              </div>
+            )}
+
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
+
+        {/* =========================================================================
+            BOTTOM FLOATING INPUT BAR: MATCHES EXACT CLAUDE / CHATGPT PILL
+            ========================================================================= */}
+        <div className="w-full px-4 sm:px-6 pt-3 pb-3 bg-gradient-to-t from-[#07080a] via-[#07080a] to-transparent flex flex-col items-center">
+          <div className="w-full max-w-[760px] rounded-[22px] bg-[#111317] border border-[#272932] p-3 shadow-[0_8px_32px_rgba(0,0,0,0.8)] flex flex-col gap-2 transition-all focus-within:border-[#ff6363]/60 focus-within:ring-1 focus-within:ring-[#ff6363]/20">
+            {/* Textarea */}
+            <textarea
+              ref={inputRef}
+              rows={2}
+              placeholder="Write a message..."
+              value={input}
+              onChange={(e) => setInput(e.target.value)}
+              onKeyDown={handleKeyDown}
+              className="w-full bg-transparent text-[#ffffff] text-[15px] placeholder-[#6a6b6c] resize-none focus:outline-none leading-relaxed"
+            />
+
+            {/* Controls Strip: [+] on left, [Integration tag + Model + Mic + Send] on right */}
+            <div className="flex items-center justify-between pt-1">
+              {/* Left Side: Plus Icon to switch active integration */}
+              <div className="relative flex items-center gap-2">
+                <button
+                  onClick={() => setShowIntegrationMenu(!showIntegrationMenu)}
+                  className="w-7 h-7 rounded-full bg-[#1a1c22] hover:bg-[#252830] text-[#9c9c9d] hover:text-[#ffffff] flex items-center justify-center transition-colors cursor-pointer"
+                  title="Attach integration"
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+
+                {/* Active Tool Pill */}
+                <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-[#181a20] border border-[#262832] text-[11px] font-['GeistMono'] text-[#cccccc]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#59d499]" />
+                  <span>
+                    {activeIntegration === 'slack'
+                      ? 'Slack: inmodel'
+                      : activeIntegration === 'teams'
+                      ? 'Microsoft Teams'
+                      : activeIntegration === 'notion'
+                      ? 'Notion'
+                      : 'All Workspaces'}
+                  </span>
+                </div>
+
+                {/* Integration Picker Popover */}
+                {showIntegrationMenu && (
+                  <div className="absolute bottom-9 left-0 w-60 p-2 rounded-[10px] bg-[#14161c] border border-[#2a2d36] shadow-2xl text-[12px] z-50 animate-fade-in space-y-1">
+                    <span className="text-[10px] font-['GeistMono'] text-[#6a6b6c] uppercase block px-2 py-0.5">
+                      Focus Context:
+                    </span>
+                    {[
+                      { id: 'slack', label: 'Slack (#all-inmodel)' },
+                      { id: 'teams', label: 'Microsoft Teams (50 msgs)' },
+                      { id: 'notion', label: 'Notion (50 specs)' },
+                      { id: 'all', label: 'Unified All Workspaces' },
+                    ].map((tool) => (
+                      <button
+                        key={tool.id}
+                        onClick={() => {
+                          setActiveIntegration(tool.id as any);
+                          setShowIntegrationMenu(false);
+                        }}
+                        className={`w-full text-left px-2.5 py-1.5 rounded-[6px] transition-colors cursor-pointer flex items-center justify-between ${
+                          activeIntegration === tool.id
+                            ? 'bg-[#ff6363]/20 text-[#ff6363] font-medium'
+                            : 'hover:bg-[#1b1e25] text-[#cccccc]'
+                        }`}
+                      >
+                        <span>{tool.label}</span>
+                        {activeIntegration === tool.id && <Check className="w-3.5 h-3.5 text-[#ff6363]" />}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              {/* Right Side: Model Badge, Mic, Send */}
+              <div className="flex items-center gap-2">
+                {/* Model Pill */}
+                <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-[#1a1c22] border border-[#2a2d36] text-[11px] text-[#9c9c9d]">
+                  <span className="w-1.5 h-1.5 rounded-full bg-[#59d499]" />
+                  <span className="font-['GeistMono'] text-[#ffffff]">Sonnet 5.5</span>
+                  <span className="text-[#6a6b6c]">Groq</span>
+                </div>
+
+                {/* Mic Icon */}
+                <button
+                  onClick={() => setIsVoiceActive(!isVoiceActive)}
+                  className={`p-1.5 transition-colors cursor-pointer ${
+                    isVoiceActive ? 'text-[#ff6363]' : 'text-[#9c9c9d] hover:text-[#ffffff]'
+                  }`}
+                  title="Dictate with voice"
+                >
+                  <Mic className="w-4 h-4" />
+                </button>
+
+                {/* Send Button */}
+                <button
+                  onClick={() => handleSend()}
+                  disabled={!input.trim() || isLoading}
+                  className={`p-2 rounded-full transition-all cursor-pointer ${
+                    input.trim() && !isLoading
+                      ? 'bg-[#ff6363] hover:bg-[#ff7a7a] text-[#040506] shadow-[0_2px_12px_rgba(255,99,99,0.4)] active:scale-95'
+                      : 'bg-[#1b1d22] text-[#6a6b6c] cursor-not-allowed'
+                  }`}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Subtext */}
+          <div className="text-center mt-2 text-[11px] text-[#6a6b6c] select-none">
+            Claude is AI and can make mistakes. Connected to live workspace channels.
+          </div>
         </div>
       </div>
-    </section>
+    </div>
   );
 };

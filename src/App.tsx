@@ -104,19 +104,21 @@ export function App() {
         </div>
       )}
 
-      {/* Floating Glass Navigation */}
-      <Navbar
-        projectName={config.projectName}
-        activeView={activeView}
-        onNavigateView={(view) => setActiveView(view)}
-        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-        onOpenCustomizer={() => setIsCustomizerOpen(true)}
-        onOpenZapierModal={() => setIsZapierModalOpen(true)}
-        onOpenTeamsCatchUp={() => setIsTeamsCatchUpOpen(true)}
-      />
+      {/* Floating Glass Navigation (Hidden in Chat view for full-screen conversational UI) */}
+      {activeView !== 'chat' && (
+        <Navbar
+          projectName={config.projectName}
+          activeView={activeView}
+          onNavigateView={(view) => setActiveView(view)}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenCustomizer={() => setIsCustomizerOpen(true)}
+          onOpenZapierModal={() => setIsZapierModalOpen(true)}
+          onOpenTeamsCatchUp={() => setIsTeamsCatchUpOpen(true)}
+        />
+      )}
 
-      {/* Main View: Landing vs AI Chatbot */}
-      <main className={`flex flex-col items-center w-full ${activeView === 'landing' ? 'pt-0' : 'pt-20'}`}>
+      {/* Main View: Landing vs Connect Hub vs AI Chatbot */}
+      <main className={`flex flex-col items-center w-full ${activeView === 'landing' ? 'pt-0' : activeView === 'chat' ? 'pt-0 h-screen overflow-hidden' : 'pt-20'}`}>
         {activeView === 'landing' ? (
           <>
             {/* Hero Section with Red/Blue Gradient Geometry & 56px Inter regular title */}
@@ -185,13 +187,15 @@ export function App() {
         )}
       </main>
 
-      {/* Footer */}
-      <Footer
-        version={config.version}
-        projectName={config.projectName}
-        onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
-        onOpenCustomizer={() => setIsCustomizerOpen(true)}
-      />
+      {/* Footer (Hidden in chat view for native full-height chat app) */}
+      {activeView !== 'chat' && (
+        <Footer
+          version={config.version}
+          projectName={config.projectName}
+          onOpenCommandPalette={() => setIsCommandPaletteOpen(true)}
+          onOpenCustomizer={() => setIsCustomizerOpen(true)}
+        />
+      )}
 
       {/* Global Command Palette Overlay Modal (⌘K) */}
       <CommandPaletteModal
