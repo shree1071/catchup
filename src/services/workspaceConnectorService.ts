@@ -184,7 +184,7 @@ export async function getFreshComposioAuthUrl(appId: string): Promise<string> {
 // Channels
 export async function fetchLiveChannels(): Promise<SlackChannel[]> {
   try {
-    const res = await fetch('/api/composio/channels');
+    const res = await fetch('/api/composio?action=channels');
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.channels) && data.channels.length > 0) {
@@ -203,7 +203,7 @@ export async function fetchLiveChannels(): Promise<SlackChannel[]> {
   // Try direct browser MCP if hosted
   try {
     const mcpRes = await callComposioBrowserMcp('COMPOSIO_MULTI_EXECUTE_TOOL', {
-      tools: [{ tool_slug: 'SLACK_LIST_ALL_CHANNELS', arguments: { types: 'public_channel', limit: 20 } }],
+      tools: [{ tool_slug: 'SLACK_LIST_ALL_CHANNELS', arguments: { types: 'public_channel', limit: 20 }, account: 'slack_hin-gonne' }],
     });
     const channels = mcpRes?.data?.results?.[0]?.response?.data?.channels;
     if (Array.isArray(channels) && channels.length > 0) {
@@ -226,7 +226,7 @@ export async function fetchLiveChannels(): Promise<SlackChannel[]> {
 
 export async function fetchLiveMessages(channelId = 'C0BBUP1LEJH'): Promise<LiveMessage[]> {
   try {
-    const res = await fetch(`/api/composio/messages?channel=${encodeURIComponent(channelId)}`);
+    const res = await fetch(`/api/composio?action=messages&channel=${encodeURIComponent(channelId)}`);
     if (res.ok) {
       const data = await res.json();
       if (data.success && Array.isArray(data.messages) && data.messages.length > 0) {
@@ -250,7 +250,7 @@ export async function fetchLiveMessages(channelId = 'C0BBUP1LEJH'): Promise<Live
   // Try direct browser MCP
   try {
     const mcpRes = await callComposioBrowserMcp('COMPOSIO_MULTI_EXECUTE_TOOL', {
-      tools: [{ tool_slug: 'SLACK_FETCH_CONVERSATION_HISTORY', arguments: { channel: channelId, limit: 10 } }],
+      tools: [{ tool_slug: 'SLACK_FETCH_CONVERSATION_HISTORY', arguments: { channel: channelId, limit: 20 }, account: 'slack_hin-gonne' }],
     });
     const messages = mcpRes?.data?.results?.[0]?.response?.data?.messages;
     if (Array.isArray(messages) && messages.length > 0) {
@@ -272,13 +272,64 @@ export async function fetchLiveMessages(channelId = 'C0BBUP1LEJH'): Promise<Live
 
   return [
     {
-      ts: '1791533412.127839',
+      ts: '1791534588.416719',
       user: 'U0BC0PNJBAN',
       userName: '@shreeharshastark',
-      text: '🚀 Antigravity AI Copilot connected to inmodel workspace! Real-time message sync is active.',
+      text: '🔒 Reminder: Security training is due by end of next week. It takes about 20 minutes. Reach out in this channel if you hit any trouble with the portal.',
       channel: 'C0BBUP1LEJH',
       channelName: '#all-inmodel',
-      timeFormatted: '1:40 PM',
+      timeFormatted: '2:16 PM',
+      category: 'alert',
+    },
+    {
+      ts: '1791534586.456829',
+      user: 'U0BC0PNJBAN',
+      userName: '@shreeharshastark',
+      text: '📈 Company metrics, September: • MRR: up 8% month over month • New customers: 42 • Churn: 1.9% (down from 2.4%) • NPS: 61. Full dashboard link coming in the next post.',
+      channel: 'C0BBUP1LEJH',
+      channelName: '#all-inmodel',
+      timeFormatted: '2:15 PM',
+      category: 'decision',
+    },
+    {
+      ts: '1791534584.341979',
+      user: 'U0BC0PNJBAN',
+      userName: '@shreeharshastark',
+      text: '👋 New hires: Please welcome Ananya (Customer Success) and Rohan (Backend Engineering) who start Monday. Say hi and share your favorite onboarding tips!',
+      channel: 'C0BBUP1LEJH',
+      channelName: '#all-inmodel',
+      timeFormatted: '2:14 PM',
+      category: 'general',
+    },
+    {
+      ts: '1791534582.607969',
+      user: 'U0BC0PNJBAN',
+      userName: '@shreeharshastark',
+      text: '📅 Upcoming events: • Mon 10:00 — Q4 kickoff (all hands) • Wed 3:00 PM — Product demo: new analytics dashboard • Fri 5:00 PM — Team social 🍕. Calendar invites are going out today.',
+      channel: 'C0BBUP1LEJH',
+      channelName: '#all-inmodel',
+      timeFormatted: '2:13 PM',
+      category: 'task',
+    },
+    {
+      ts: '1791534579.552979',
+      user: 'U0BC0PNJBAN',
+      userName: '@shreeharshastark',
+      text: '🎉 Kudos corner: Big thanks to @Priya for staying late to fix the billing bug before the weekend. Customers never noticed, and that\'s the best compliment.',
+      channel: 'C0BBUP1LEJH',
+      channelName: '#all-inmodel',
+      timeFormatted: '2:12 PM',
+      category: 'general',
+    },
+    {
+      ts: '1791534563.603599',
+      user: 'U0BC0PNJBAN',
+      userName: '@shreeharshastark',
+      text: '📢 Welcome to inmodel! This channel is for company-wide announcements and team updates.',
+      channel: 'C0BBUP1LEJH',
+      channelName: '#all-inmodel',
+      timeFormatted: '2:10 PM',
+      category: 'general',
     },
   ];
 }

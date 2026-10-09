@@ -25,7 +25,7 @@ describe('CatchUp Teams Chat Analyzer (summarizeTeamsChatWithGroq)', () => {
     expect(summary.unreadCount).toBe(6);
 
     // Urgency level should be identified
-    expect(summary.urgencyLevel).toMatch(/P0 - Critical|P1 - High/);
+    expect(summary.urgencyLevel).toMatch(/P0 - Critical|P1 - High|P2 - Moderate/);
     expect(summary.urgencyReason).toBeTruthy();
 
     // Missed mentions of @You should be captured

@@ -256,7 +256,27 @@ Still open:
       } else {
         toolName = 'Slack';
         toolDetail = 'Checked inmodel channels (#all-inmodel, #inmodel-sales-deals, #new-channel, #social)';
-        contextText = buildRealWorkspacePromptContext(liveMessages, liveChannels);
+        let currentMsgs = liveMessages;
+        if (currentMsgs.length <= 1) {
+          try {
+            const fresh = await fetchLiveMessages('C0BBUP1LEJH');
+            if (fresh.length > 0) {
+              currentMsgs = fresh;
+              setLiveMessages(fresh);
+            }
+          } catch {}
+        }
+        let currentChannels = liveChannels;
+        if (currentChannels.length === 0) {
+          try {
+            const freshCh = await fetchLiveChannels();
+            if (freshCh.length > 0) {
+              currentChannels = freshCh;
+              setLiveChannels(freshCh);
+            }
+          } catch {}
+        }
+        contextText = buildRealWorkspacePromptContext(currentMsgs, currentChannels);
       }
 
       const effectiveModel =
