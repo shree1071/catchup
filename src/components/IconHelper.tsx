@@ -1,0 +1,91 @@
+import React from 'react';
+import {
+  Zap,
+  Cpu,
+  Bot,
+  Layers,
+  ShieldCheck,
+  Activity,
+  Sparkles,
+  Database,
+  GitPullRequest,
+  Radio,
+  Box,
+  Shield,
+  Search,
+  Play,
+  UploadCloud,
+  Key,
+  FileText,
+  Terminal,
+  Command,
+  ArrowRight,
+  Check,
+  Copy,
+  ExternalLink,
+  Laptop,
+  Flame,
+  Code,
+  Sliders,
+  X,
+  ChevronRight,
+  Globe,
+  SlidersHorizontal,
+  MessageSquare,
+  Calendar,
+  AlertTriangle,
+  ListTodo,
+  AtSign,
+  Clock,
+} from 'lucide-react';
+
+interface IconHelperProps {
+  name: string;
+  className?: string;
+  size?: number;
+}
+
+const iconMap: Record<string, React.ElementType> = {
+  Zap,
+  Cpu,
+  Bot,
+  Layers,
+  ShieldCheck,
+  Activity,
+  Sparkles,
+  Database,
+  GitPullRequest,
+  Radio,
+  Box,
+  Shield,
+  Search,
+  Play,
+  UploadCloud,
+  Key,
+  FileText,
+  Terminal,
+  Command,
+  ArrowRight,
+  Check,
+  Copy,
+  ExternalLink,
+  Laptop,
+  Flame,
+  Code,
+  Sliders,
+  X,
+  ChevronRight,
+  Globe,
+  SlidersHorizontal,
+  MessageSquare,
+  Calendar,
+  AlertTriangle,
+  ListTodo,
+  AtSign,
+  Clock,
+};
+
+export const IconHelper: React.FC<IconHelperProps> = ({ name, className = 'w-5 h-5', size }) => {
+  const IconComponent = iconMap[name] || Zap;
+  return <IconComponent className={className} size={size} />;
+};
